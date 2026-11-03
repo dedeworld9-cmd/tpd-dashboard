@@ -1,0 +1,24 @@
+import { expect, test } from "@playwright/test";
+import { asRole } from "./helpers";
+
+test("mobile tab bar and navigation drawer", async ({ page }) => {
+  await asRole(page, "officer");
+  const tabs = page.getByRole("navigation", { name: "Quick navigation" });
+  await expect(tabs).toBeVisible();
+  await tabs.getByRole("link", { name: "Patrol" }).click();
+  await expect(page).toHaveURL(/\/hq\/patrol$/);
+  await tabs.getByRole("button", { name: "More" }).click();
+  const drawer = page.getByRole("dialog", { name: "Navigation" });
+  await drawer.getByRole("link", { name: "Requests" }).click();
+  await expect(page).toHaveURL(/\/hq\/requests/);
+  await expect(drawer).toBeHidden();
+});
+
+test("no horizontal page overflow on key screens", async ({ page }) => {
+  for (const [role, path] of [["officer", "/hq"], ["officer", "/hq/patrol"], ["command", "/hq/command"]] as const) {
+    await asRole(page, role, path);
+    await page.waitForTimeout(400);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, path).toBeLessThanOrEqual(0);
+  }
+});

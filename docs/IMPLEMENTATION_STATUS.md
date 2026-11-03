@@ -45,3 +45,21 @@ Deliberate limits
 ## Next
 Milestone 2: Discord sign-in, account linking, capability engine, personnel schema and roster import.
 Blocked on the external items above.
+
+## Redesign — black-and-gold system and reference screens · in progress (2026-11-03)
+
+dede rejected the Milestone 1 look and issued two directives (design reformation; advanced UI/UX and interaction). Work so far:
+
+Done
+- Brand: department badge cut out to a transparent PNG without altering it (`public/brand/tpd-badge.png`, 207×265 source); favicon and touch icon from it. In-game Charger photo and Tampa skyline banner added as WebP.
+- Tokens: Obsidian / Graphite / Heritage gold / Warm ivory palette in light and dark, Archivo variable type (wide display cuts), gold-ink for AA text on light surfaces.
+- Component library (`src/components/ui`): buttons, fields, pills, cards, dialogs and sheets on native `<dialog>`, popovers and menus with keyboard support, tooltips, toasts, skeletons, tabs, segmented controls, hour meter, bar/stack/capacity charts, data table (sort, column visibility, selection, row menus, sticky header, pagination, CSV export).
+- Authorization moved to `src/lib/authz` (`can()`, `canDecide()`), with handbook citations and interim rules marked.
+- Design-preview data layer (`src/lib/preview/store.ts`): browser-local sample state that mirrors the planned server contracts (idempotent start, one open session, 12 h cap with review flag, authz on every decision, mandatory reasons, append-only history, double-submit guard). M2+ swaps it for server actions.
+- Shell: collapsible obsidian sidebar (persisted), workspace switcher, role-filtered nav, live duty status, account menu with "Preview as" personas, theme, shortcuts, reset; top bar with breadcrumbs, quick actions, notification center; Ctrl/⌘K command palette; g-letter shortcuts; mobile tab bar and drawer.
+- Reference screens: Member Dashboard (adapts to off duty, on duty, probationary, supervisor, command), Active Patrol workspace (start, recover, end with confirmation, weekly progress, six-week trend, history with corrections, supervisors on duty, fleet, policy refs), Command Center (KPIs, staffing, compliance, division capacity, decision queue with saved views and filters, approval panel). Requests workspace rebuilt on the same table and panel.
+- Tests: 22 unit (authz, week math incl. DST, store operations) and 16 Playwright end-to-end. See TEST_RESULTS.md.
+
+Remaining
+- Public homepage rebuild; Personnel (side panel + admin flows), Training, Divisions, Activity, Supervisor, Resources and Settings on the new system.
+- Not deployed. Awaiting dede's review.

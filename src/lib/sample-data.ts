@@ -7,21 +7,8 @@
  * docs/REQUIREMENTS.md. Real data arrives with Milestone 2 and replaces this file.
  */
 
-export const RANKS = [
-  "Chief of Police",
-  "Deputy Chief",
-  "Assistant Chief",
-  "Major",
-  "Captain",
-  "Lieutenant",
-  "Sergeant",
-  "Corporal",
-  "Senior Officer",
-  "Officer",
-  "Reserve Officer",
-  "Probationary Officer",
-] as const;
-export type Rank = (typeof RANKS)[number];
+import { RANKS, type Rank } from "./authz";
+export { RANKS, type Rank };
 
 export type District = "North" | "South" | "Department";
 export type Status = "Active" | "On leave" | "Probationary" | "Suspended";
