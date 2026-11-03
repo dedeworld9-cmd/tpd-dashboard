@@ -28,7 +28,7 @@ export function ResourcesWorkspace() {
         ))}
       </div>
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card>
+        <Card id="fleet" className="scroll-mt-20">
           <CardHeader title="Fleet matrix" description="Which ranks may drive each vehicle (roster, Vehicles tab; Handbook §11)" />
           <div className="overflow-x-auto border-t border-line">
             <table className="w-full min-w-[560px] text-left text-xs whitespace-nowrap">

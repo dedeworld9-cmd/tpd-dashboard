@@ -193,6 +193,15 @@ function load(): PreviewState {
   return state;
 }
 
+/** Re-reads persisted state if present (another tab may have written it). Keeps memory state otherwise. */
+function refresh() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    const parsed = raw ? (JSON.parse(raw) as PreviewState) : null;
+    if (parsed?.version === VERSION) state = parsed;
+  } catch {}
+}
+
 function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
@@ -273,6 +282,8 @@ export function openSessionFor(s: PreviewState, memberId: string): SessionRecord
 // ---------------------------------------------------------------- operations
 
 export class OperationError extends Error {}
+/** The record changed after the caller read it. */
+export class StaleError extends OperationError {}
 
 const LATENCY = 550;
 const inFlight = new Set<string>();
@@ -331,12 +342,21 @@ export const patrol = {
 export type Decision = "Approved" | "Denied" | "Clarification requested";
 
 export const requests = {
-  decide(id: string, decision: Decision, reason: string) {
+  /**
+   * Records a decision. `expectedVersion` is the history length the reviewer
+   * saw; if anyone else acted since, the decision is refused (optimistic
+   * concurrency) so a reviewer never decides on a stale record.
+   */
+  decide(id: string, decision: Decision, reason: string, expectedVersion?: number) {
     return guarded(`req:${id}`, () => {
+      refresh(); // re-read the shared record: another tab or reviewer may have changed it
       const s = load();
       const me = currentMember(s);
       const r = s.requests.find((x) => x.id === id);
       if (!r) throw new OperationError("This request no longer exists.");
+      if (expectedVersion !== undefined && r.history.length !== expectedVersion) {
+        throw new StaleError("This request changed since you opened it. Review the latest history before deciding.");
+      }
       if (r.state !== "Submitted" && r.state !== "Under review") throw new OperationError(`This request is already ${r.state.toLowerCase()}.`);
       if (!canDecide(actorFor(me), r.type, r.memberId === me.id)) throw new OperationError("You are not authorized to decide this request.");
       if (reason.trim().length < 5) throw new OperationError("Record a reason of at least a few words.");

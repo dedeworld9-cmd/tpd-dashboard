@@ -15,10 +15,12 @@ test("mobile tab bar and navigation drawer", async ({ page }) => {
 });
 
 test("no horizontal page overflow on key screens", async ({ page }) => {
-  for (const [role, path] of [["officer", "/hq"], ["officer", "/hq/patrol"], ["command", "/hq/command"]] as const) {
+  for (const [role, path] of [["officer", "/hq"], ["officer", "/hq/patrol"], ["command", "/hq"], ["command", "/hq/command"], ["command", "/hq/command?id=REQ-1047"]] as const) {
     await asRole(page, role, path);
     await page.waitForTimeout(400);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, path).toBeLessThanOrEqual(0);
+    // A too-wide layout makes mobile browsers zoom out, which hides overflow from the check above.
+    expect(await page.evaluate(() => window.innerWidth), `${path} layout width`).toBe(page.viewportSize()!.width);
   }
 });

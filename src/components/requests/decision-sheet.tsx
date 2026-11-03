@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 import { formatMinutes, REQUIRED_MINUTES, formatTime } from "@/lib/domain/activity";
 import { exemptReason, memberWeek } from "@/lib/preview/derived";
 import { useMe } from "@/lib/preview/hooks";
-import { memberById, OperationError, requests, type Decision, type PreviewState, type RequestRecord } from "@/lib/preview/store";
+import { memberById, OperationError, requests, StaleError, type Decision, type PreviewState, type RequestRecord } from "@/lib/preview/store";
 import { stateTone } from "@/lib/request-tone";
 
 const DECISIONS: { value: Decision; label: string; icon: typeof CheckCircle2; cls: string }[] = [
@@ -37,11 +37,17 @@ export function DecisionSheet({ request, state, onClose }: { request: RequestRec
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  // The history length the reviewer has seen; a decision on an older version is refused.
+  const [seen, setSeen] = useState<number | null>(null);
 
   useEffect(() => {
     setDecision(null);
     setReason("");
     setError(null);
+    setConfirming(false);
+    setSeen(request ? request.history.length : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when a different request opens
   }, [request?.id]);
 
   if (!me) return null;
@@ -54,22 +60,41 @@ export function DecisionSheet({ request, state, onClose }: { request: RequestRec
   const now = Date.now();
   const week = member ? memberWeek(state, member.id, now) : 0;
 
-  async function submit(e: React.FormEvent) {
+  const stale = !!r && seen !== null && r.history.length !== seen && open;
+
+  function review(e: React.FormEvent) {
     e.preventDefault();
+    if (!r || !decision || busy) return;
+    // Mirrors the store's rule so the reviewer sees the problem before confirming; the store checks again.
+    if (reason.trim().length < 5) {
+      setError("Record a reason of at least a few words.");
+      return;
+    }
+    setError(null);
+    setConfirming(true);
+  }
+
+  async function confirm() {
     if (!r || !decision || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await requests.decide(r.id, decision, reason);
+      const next = await requests.decide(r.id, decision, reason, seen ?? undefined);
       toast(decision === "Approved" ? "success" : "info", `${r.id} ${decision === "Clarification requested" ? "sent back for more information" : decision.toLowerCase()}`, `Status is now ${next}. ${member?.name ?? "The member"} is notified.`);
       setDecision(null);
       setReason("");
+      setConfirming(false);
+      setSeen((v) => (v ?? 0) + 1); // our own event is not a concurrent change
     } catch (err) {
-      if (!(err instanceof OperationError && err.message === "Already in progress")) setError(err instanceof Error ? err.message : "Try again.");
+      setConfirming(false);
+      if (err instanceof StaleError) setError(err.message);
+      else if (!(err instanceof OperationError && err.message === "Already in progress")) setError(err instanceof Error ? err.message : "Try again.");
     } finally {
       setBusy(false);
     }
   }
+
+  const label = decision ? DECISIONS.find((d) => d.value === decision)!.label : "";
 
   return (
     <Sheet
@@ -85,12 +110,28 @@ export function DecisionSheet({ request, state, onClose }: { request: RequestRec
       }
       footer={
         r && open && allowed ? (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-3xs text-muted">Your reason is shared with the member and kept in history.</p>
-            <Button type="submit" form={`${id}-f`} loading={busy} disabled={!decision} variant={decision === "Denied" ? "danger" : "primary"}>
-              {busy ? "Recording…" : decision ? `Record: ${DECISIONS.find((d) => d.value === decision)!.label}` : "Choose a decision"}
-            </Button>
-          </div>
+          confirming ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-2xs text-ink-2">
+                <span className="font-semibold">{label}</span> {r.id} for {member?.name}? The member is notified with your reason.
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setConfirming(false)} disabled={busy}>
+                  Back
+                </Button>
+                <Button size="sm" onClick={confirm} loading={busy} variant={decision === "Denied" ? "danger" : "primary"}>
+                  {busy ? "Recording…" : `Confirm: ${label}`}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-3xs text-muted">Your reason is shared with the member and kept in history.</p>
+              <Button type="submit" form={`${id}-f`} disabled={!decision || stale} variant={decision === "Denied" ? "danger" : "primary"}>
+                {decision ? `Record: ${label}` : "Choose a decision"}
+              </Button>
+            </div>
+          )
         ) : undefined
       }
     >
@@ -186,7 +227,17 @@ export function DecisionSheet({ request, state, onClose }: { request: RequestRec
               {r.memberId === me.member.id ? "Another reviewer will decide it." : `Requires ${reviewRequirement(r.type)}.`}
             </Callout>
           ) : (
-            <form id={`${id}-f`} onSubmit={submit} className="flex flex-col gap-3">
+            <form id={`${id}-f`} onSubmit={review} className="flex flex-col gap-3">
+              {stale ? (
+                <Callout tone="warn" title="This request changed while you had it open">
+                  <span className="flex flex-wrap items-center gap-2">
+                    Check the latest history above before deciding.
+                    <Button size="xs" variant="secondary" onClick={() => (setSeen(r.history.length), setError(null))}>
+                      I’ve reviewed the update
+                    </Button>
+                  </span>
+                </Callout>
+              ) : null}
               <fieldset>
                 <legend className="mb-1.5 text-xs font-semibold">Decision</legend>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -196,7 +247,7 @@ export function DecisionSheet({ request, state, onClose }: { request: RequestRec
                       type="button"
                       aria-pressed={decision === d.value}
                       data-on={decision === d.value}
-                      onClick={() => setDecision(d.value)}
+                      onClick={() => (setDecision(d.value), setConfirming(false))}
                       className={cn("flex h-10 items-center justify-center gap-1.5 rounded-md text-xs font-semibold text-ink-2 ring-1 ring-line-strong ring-inset transition-colors hover:bg-surface-2", d.cls)}
                     >
                       <d.icon className="size-4" aria-hidden />
@@ -206,7 +257,7 @@ export function DecisionSheet({ request, state, onClose }: { request: RequestRec
                 </div>
               </fieldset>
               <Field label="Reason" htmlFor={`${id}-r`} error={error} hint="Required for every decision.">
-                <Textarea id={`${id}-r`} value={reason} onChange={(e) => setReason(e.target.value)} rows={3} aria-invalid={!!error || undefined} />
+                <Textarea id={`${id}-r`} value={reason} onChange={(e) => (setReason(e.target.value), setConfirming(false))} rows={3} aria-invalid={!!error || undefined} />
               </Field>
             </form>
           )}

@@ -1,3 +1,4 @@
+import { ANNOUNCEMENTS } from "@/lib/announcements";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Car, FileText, Megaphone, Radio, Scale, Star, UserPlus } from "lucide-react";
@@ -34,10 +35,7 @@ const LEADERSHIP = [
   { tier: 1, group: "Patrol Bureau", ranks: ["Corporal", "Senior Officer", "Officer", "Reserve Officer", "Probationary Officer"] },
 ];
 
-const NEWS = [
-  { date: "Oct 30, 2026", title: "Personnel Handbook and Use of Force Policy take effect", body: "Both documents, approved by the Chief of Police, now govern every member of the department.", href: HANDBOOK_URL },
-  { date: "Oct 30, 2026", title: "The department opens its roster", body: "The first members were hired onto the department roster.", href: "#join" },
-];
+const NEWS = ANNOUNCEMENTS;
 
 export default function HomePage() {
   return (

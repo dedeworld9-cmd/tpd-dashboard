@@ -15,7 +15,7 @@ import { Dot, Pill } from "@/components/ui/status";
 import { Card } from "@/components/ui/surface";
 import { can, RANKS } from "@/lib/authz";
 import { formatMinutes } from "@/lib/domain/activity";
-import { roster, type Band, type RosterRow } from "@/lib/preview/derived";
+import { needsReview, roster, type Band, type RosterRow } from "@/lib/preview/derived";
 import { useMe, useNow } from "@/lib/preview/hooks";
 import { memberById, usePreviewState } from "@/lib/preview/store";
 import { DIVISIONS } from "@/lib/sample-data";
@@ -36,11 +36,14 @@ export function PersonnelWorkspace() {
   const params = useSearchParams();
   const memberId = params.get("member");
   const [q, setQ] = useState(params.get("q") ?? "");
-  const [district, setDistrict] = useState("");
+  // Filters start from the URL so metric links (Command Center, dashboard) land on the matching view.
+  const [district, setDistrict] = useState(params.get("district") ?? "");
   const [tier, setTier] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(params.get("status") ?? "");
   const [division, setDivision] = useState("");
-  const [onlyOnDuty, setOnlyOnDuty] = useState(false);
+  const [week, setWeek] = useState(params.get("band") ?? "");
+  const [review, setReview] = useState(params.get("review") === "1");
+  const [onlyOnDuty, setOnlyOnDuty] = useState(params.get("duty") === "1");
 
   const all = useMemo(() => (state && now ? roster(state, now) : []), [state, now]);
   const rows = useMemo(() => {
@@ -49,12 +52,14 @@ export function PersonnelWorkspace() {
       (r) =>
         (!district || r.member.district === district) &&
         (!tier || String(rankTier(r.member.rank)) === tier) &&
-        (!status || r.member.status === status) &&
+        (!status || (status === "current" ? r.member.status !== "Suspended" : r.member.status === status)) &&
+        (!week || (week === "incomplete" ? r.band === "on-track" || r.band === "at-risk" : r.band === week)) &&
+        (!review || needsReview(state!, r.member.id)) &&
         (!division || r.member.divisions.includes(division)) &&
         (!onlyOnDuty || r.onDuty) &&
         (!query || `${r.member.name} ${r.member.callsign} ${r.member.appointment} ${r.member.rank}`.toLowerCase().includes(query)),
     );
-  }, [all, q, district, tier, status, division, onlyOnDuty]);
+  }, [all, q, district, tier, status, division, week, review, onlyOnDuty, state]);
 
   if (!state || !now) {
     return (
@@ -117,7 +122,7 @@ export function PersonnelWorkspace() {
     { key: "timezone", header: "Timezone", hideable: true, defaultHidden: true, sort: (r) => r.member.timezone, cell: (r) => r.member.timezone },
   ];
 
-  const filters = [district, tier, status, division].filter(Boolean).length + (onlyOnDuty ? 1 : 0);
+  const filters = [district, tier, status, division, week].filter(Boolean).length + (onlyOnDuty ? 1 : 0) + (review ? 1 : 0);
 
   return (
     <Page wide>
@@ -157,6 +162,7 @@ export function PersonnelWorkspace() {
               </Select>
               <Select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)} className="[&_select]:h-8 [&_select]:text-xs">
                 <option value="">Status: any</option>
+                <option value="current">Not suspended</option>
                 {(["Active", "On leave", "Probationary", "Suspended"] as const).map((s) => (
                   <option key={s}>{s}</option>
                 ))}
@@ -167,12 +173,23 @@ export function PersonnelWorkspace() {
                   <option key={d.slug}>{d.name}</option>
                 ))}
               </Select>
+              <Select aria-label="This week" value={week} onChange={(e) => setWeek(e.target.value)} className="[&_select]:h-8 [&_select]:text-xs">
+                <option value="">This week: any</option>
+                <option value="met">Met 3 hours</option>
+                <option value="incomplete">Incomplete</option>
+                <option value="at-risk">Below half</option>
+                <option value="exempt">Exempt</option>
+              </Select>
+              <label className="flex items-center gap-2 text-2xs font-medium text-ink-2">
+                <input type="checkbox" checked={review} onChange={(e) => setReview(e.target.checked)} className="size-3.5 accent-[var(--gold-ink)]" />
+                Needs review
+              </label>
               <label className="flex items-center gap-2 text-2xs font-medium text-ink-2">
                 <input type="checkbox" checked={onlyOnDuty} onChange={(e) => setOnlyOnDuty(e.target.checked)} className="size-3.5 accent-[var(--gold-ink)]" />
                 On duty
               </label>
               {filters ? (
-                <Button size="xs" variant="ghost" onClick={() => (setDistrict(""), setTier(""), setStatus(""), setDivision(""), setOnlyOnDuty(false))}>
+                <Button size="xs" variant="ghost" onClick={() => (setDistrict(""), setTier(""), setStatus(""), setDivision(""), setWeek(""), setReview(false), setOnlyOnDuty(false), router.replace(pathname, { scroll: false }))}>
                   Clear {filters}
                 </Button>
               ) : null}

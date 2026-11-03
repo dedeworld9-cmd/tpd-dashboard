@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Dialog } from "@/components/ui/overlay";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { toast } from "@/components/ui/feedback";
 import { can } from "@/lib/authz";
 import { formatMinutes, weekMinutes, formatTime } from "@/lib/domain/activity";
 import { useMe, useNow } from "@/lib/preview/hooks";
-import { OperationError, patrol, usePreviewState, type PatrolDistrict, type SessionRecord } from "@/lib/preview/store";
+import { getPreviewState, OperationError, patrol, usePreviewState, type PatrolDistrict, type SessionRecord } from "@/lib/preview/store";
 
 /**
  * Patrol lifecycle shared by the dashboard, patrol console, sidebar and
@@ -38,6 +39,8 @@ export function PatrolProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState<"starting" | "ending" | null>(null);
   const [recovering, setRecovering] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [summary, setSummary] = useState<{ session: SessionRecord; weekAfter: number } | null>(null);
+  const router = useRouter();
   const checked = useRef(false);
   const now = useNow(1000, confirmOpen);
 
@@ -85,12 +88,9 @@ export function PatrolProvider({ children }: { children: ReactNode }) {
     try {
       const s = await patrol.end();
       setConfirmOpen(false);
-      const mins = Math.floor(((s.end ?? Date.now()) - s.start) / 60000);
-      toast(
-        s.flag === "Needs review" ? "info" : "success",
-        s.flag === "Needs review" ? "Patrol ended and flagged for review" : "Patrol ended",
-        s.flag === "Needs review" ? "The session ran past 12 hours, so it was capped and sent to your supervisor." : `${formatMinutes(mins)} added to this week.`,
-      );
+      const st = getPreviewState();
+      const weekAfter = weekMinutes(st.sessions.filter((x) => x.memberId === s.memberId && x.end).map((x) => ({ start: x.start, end: x.end! })), new Date());
+      setSummary({ session: s, weekAfter });
     } catch (e) {
       toast("error", "Patrol not ended", e instanceof Error ? e.message : "Try again.");
     } finally {
@@ -116,28 +116,61 @@ export function PatrolProvider({ children }: { children: ReactNode }) {
               Keep patrolling
             </Button>
             <Button variant="danger" onClick={confirmEnd} loading={busy === "ending"}>
-              {busy === "ending" ? "Ending…" : "End patrol"}
+              {busy === "ending" ? "Ending…" : "Confirm end patrol"}
             </Button>
           </>
         }
       >
         {me?.session ? (
-          <dl className="grid grid-cols-3 gap-3 rounded-lg bg-surface-2 p-3 ring-1 ring-inset ring-line">
-            <div>
-              <dt className="text-3xs text-muted">District</dt>
-              <dd className="text-xs font-semibold">{me.session.district}</dd>
-            </div>
-            <div>
-              <dt className="text-3xs text-muted">This session</dt>
-              <dd className="text-xs font-semibold tabular">{formatMinutes(elapsedMin)}</dd>
-            </div>
-            <div>
-              <dt className="text-3xs text-muted">Week after</dt>
-              <dd className="text-xs font-semibold tabular">{formatMinutes(week + elapsedMin)}</dd>
-            </div>
+          <dl className="grid grid-cols-2 gap-3 rounded-lg bg-surface-2 p-3 ring-1 ring-inset ring-line">
+            <SummaryItem label="District" value={`${me.session.district} District`} />
+            <SummaryItem label="Started" value={formatTime(me.session.start)} />
+            <SummaryItem label="Session so far" value={formatMinutes(elapsedMin)} />
+            <SummaryItem label="Week after recording" value={`${formatMinutes(week + elapsedMin)} of 3h`} />
+          </dl>
+        ) : null}
+      </Dialog>
+      <Dialog
+        open={!!summary}
+        onClose={() => setSummary(null)}
+        title={summary?.session.flag === "Needs review" ? "Patrol recorded and flagged" : "Patrol recorded"}
+        description={summary?.session.flag === "Needs review" ? "The session ran past 12 hours, so it was capped and sent to your supervisor for review." : "Your session is on record and counted toward this week."}
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const id = summary?.session.id;
+                setSummary(null);
+                if (id) router.push(`/hq/patrol?session=${id}#history`);
+              }}
+            >
+              View session
+            </Button>
+            <Button onClick={() => setSummary(null)}>Done</Button>
+          </>
+        }
+      >
+        {summary ? (
+          <dl className="grid grid-cols-2 gap-3 rounded-lg bg-surface-2 p-3 ring-1 ring-inset ring-line">
+            <SummaryItem label="Session" value={summary.session.id} />
+            <SummaryItem label="District" value={`${summary.session.district} District`} />
+            <SummaryItem label="Time" value={`${formatTime(summary.session.start)}–${formatTime(summary.session.end!)}`} />
+            <SummaryItem label="Recorded" value={formatMinutes(Math.floor((summary.session.end! - summary.session.start) / 60000))} />
+            <SummaryItem label="This week" value={`${formatMinutes(summary.weekAfter)} of 3h`} />
           </dl>
         ) : null}
       </Dialog>
     </Ctx.Provider>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-3xs text-muted">{label}</dt>
+      <dd className="truncate text-xs font-semibold tabular">{value}</dd>
+    </div>
   );
 }

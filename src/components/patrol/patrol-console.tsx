@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useMemo, useState } from "react";
 import { AlertTriangle, BookOpen, Car, ExternalLink, History, Lock, MapPin, Play, RotateCw, ShieldCheck, Square } from "lucide-react";
 import { usePatrol } from "./patrol-provider";
+import { SessionDrawer, sessionStatus } from "./session-drawer";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Page, PageHeader } from "@/components/shell/page";
 import { ANCHORCAD_URL } from "@/components/shell/nav-config";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -54,8 +56,8 @@ export function PatrolConsole() {
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-5">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,68fr)_minmax(300px,32fr)] xl:gap-6">
+        <div className="flex min-w-0 flex-col gap-5 xl:gap-6">
           {!patrol.canStart && !me.session ? (
             <LockedConsole />
           ) : patrol.phase === "recovering" ? (
@@ -66,7 +68,7 @@ export function PatrolConsole() {
             <StartConsole state={state} />
           )}
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:gap-6">
             <WeekProgress state={state} now={now} week={week} />
             <Trend state={state} now={now} />
           </div>
@@ -74,7 +76,7 @@ export function PatrolConsole() {
           <SessionHistory state={state} />
         </div>
 
-        <aside aria-label="Patrol references" className="flex min-w-0 flex-col gap-5">
+        <aside aria-label="Patrol references" className="flex min-w-0 flex-col gap-5 xl:gap-6">
           <SupervisorsOnDuty state={state} now={now} />
           <Fleet />
           <PolicyRefs />
@@ -90,7 +92,10 @@ function ConsoleFrame({ children, live }: { children: React.ReactNode; live?: bo
   return (
     <section aria-label="Patrol console" className="relative isolate overflow-hidden rounded-xl bg-obsidian text-on-dark shadow-md ring-1 ring-dark-line">
       <Image src="/brand/charger-hero.webp" alt="" fill sizes="(min-width:1280px) 1000px, 100vw" className="-z-10 object-cover object-[70%_55%] opacity-35" priority />
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(95deg,var(--obsidian)_38%,color-mix(in_srgb,var(--obsidian)_55%,transparent)_75%,color-mix(in_srgb,var(--obsidian)_25%,transparent))]" />
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-[linear-gradient(95deg,var(--obsidian)_38%,color-mix(in_srgb,var(--obsidian)_60%,transparent)_70%,color-mix(in_srgb,var(--obsidian)_40%,transparent)),linear-gradient(0deg,color-mix(in_srgb,var(--obsidian)_55%,transparent),transparent_60%)]"
+      />
       {live ? <div aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-gold" /> : null}
       {children}
     </section>
@@ -181,7 +186,7 @@ function ActiveConsole({ session, now, week }: { session: SessionRecord; now: nu
             ].map(([l, v]) => (
               <div key={l} className="min-w-0">
                 <dt className="text-3xs text-on-dark-muted">{l}</dt>
-                <dd className="mt-0.5 truncate text-xs font-semibold">{v}</dd>
+                <dd className="mt-0.5 text-xs font-semibold break-words">{v}</dd>
               </div>
             ))}
           </dl>
@@ -195,13 +200,18 @@ function ActiveConsole({ session, now, week }: { session: SessionRecord; now: nu
         </div>
         <div className="flex flex-col gap-2.5 lg:w-52 lg:justify-end">
           {ANCHORCAD_URL ? (
-            <a href={ANCHORCAD_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-gold px-5 text-sm font-semibold text-on-gold hover:bg-gold-hover">
+            <a
+              href={ANCHORCAD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-gold px-5 text-sm font-semibold text-on-gold hover:bg-gold-hover"
+            >
               <ExternalLink className="size-4" aria-hidden /> Open AnchorCAD
             </a>
           ) : (
-            <Button variant="dark" size="lg" disabled title="The AnchorCAD link has not been configured yet">
-              <ExternalLink className="size-4" aria-hidden /> AnchorCAD (not linked)
-            </Button>
+            <p role="status" className="flex h-11 items-center justify-center gap-2 rounded-md bg-obsidian-2/90 px-4 text-xs font-medium text-on-dark-muted ring-1 ring-dark-line">
+              <ExternalLink className="size-4" aria-hidden /> AnchorCAD link not configured
+            </p>
           )}
           <Button variant="danger" size="lg" onClick={patrol.requestEnd} loading={patrol.phase === "ending"} disabled={patrol.phase !== "on-duty"} icon={<Square className="size-3.5 fill-current" />}>
             {patrol.phase === "ending" ? "Ending…" : "End patrol"}
@@ -257,7 +267,17 @@ function LockedConsole() {
 export function WeekProgress({ state, now, week }: { state: PreviewState; now: number; week: number }) {
   const me = useMe()!;
   const daily = memberDaily(state, me.member.id, now);
-  const today = (new Date(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now)).getDay() + 6) % 7;
+  const today =
+    (new Date(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(now),
+    ).getDay() +
+      6) %
+    7;
   const exempt = exemptReason(me.member);
   const left = Math.max(0, REQUIRED_MINUTES - week);
   return (
@@ -275,12 +295,24 @@ export function Trend({ state, now }: { state: PreviewState; now: number }) {
   const me = useMe()!;
   const trend = memberTrend(state, me.member.id, now, 6);
   const met = trend.filter((t) => t.minutes >= REQUIRED_MINUTES).length;
+  const history = trend.slice(0, -1).some((t) => t.minutes > 0);
   return (
     <Card>
-      <CardHeader title="Six-week trend" description={`Met the requirement ${met} of the last 6 weeks`} />
-      <div className="px-4 pt-3 pb-4">
-        <BarChart values={trend.map((t) => t.minutes)} labels={trend.map((t) => t.label)} target={REQUIRED_MINUTES} highlight={trend.length - 1} height={120} label="Weekly patrol minutes, last six weeks" />
-      </div>
+      <CardHeader title="Six-week trend" description={history ? `Met the requirement ${met} of the last 6 weeks` : "Weekly totals, target 3 hours"} />
+      {!history ? (
+        <EmptyState icon={<History />} title="Not enough history yet" body="Your trend appears once you have patrols in earlier weeks." />
+      ) : (
+        <div className="px-4 pt-3 pb-4">
+          <BarChart
+            values={trend.map((t) => t.minutes)}
+            labels={trend.map((t) => t.label)}
+            target={REQUIRED_MINUTES}
+            highlight={trend.length - 1}
+            height={120}
+            label="Weekly patrol minutes, last six weeks"
+          />
+        </div>
+      )}
     </Card>
   );
 }
@@ -289,79 +321,102 @@ export function Trend({ state, now }: { state: PreviewState; now: number }) {
 
 export function SessionHistory({ state }: { state: PreviewState }) {
   const me = useMe()!;
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const [target, setTarget] = useState<SessionRecord | null>(null);
-  const mine = state.sessions.filter((s) => s.memberId === me.member.id && s.end !== null).sort((a, b) => b.start - a.start);
-  const [limit, setLimit] = useState(8);
+  const mine = useMemo(() => state.sessions.filter((s) => s.memberId === me.member.id && s.end !== null), [state.sessions, me.member.id]);
+  const openId = params.get("session");
+  const open = openId ? (state.sessions.find((s) => s.id === openId) ?? null) : null;
+  const show = (s: SessionRecord) => router.replace(`${pathname}?session=${s.id}#history`, { scroll: false });
+  const hide = () => router.replace(`${pathname}#history`, { scroll: false });
 
   useEffect(() => {
-    if (window.location.hash === "#history") document.getElementById("history")?.scrollIntoView({ block: "start" });
-  }, []);
+    if (window.location.hash === "#history" && !openId) document.getElementById("history")?.scrollIntoView({ block: "start" });
+  }, [openId]);
+
+  const columns: Column<SessionRecord>[] = [
+    {
+      key: "date",
+      header: "Date",
+      sort: (s) => s.start,
+      text: (s) => new Date(s.start).toISOString(),
+      cell: (s) => (
+        <span className="leading-tight">
+          <span className="block font-medium">
+            {new Date(s.start).toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+          <span className="block text-3xs text-muted">{s.id}</span>
+        </span>
+      ),
+    },
+    {
+      key: "district",
+      header: "District",
+      sort: (s) => s.district,
+      cell: (s) => s.district,
+    },
+    {
+      key: "range",
+      header: "Time range",
+      text: (s) => `${time(s.start)}-${time(s.end!)}`,
+      cell: (s) => (
+        <span className="tabular text-ink-2">
+          {time(s.start)}–{time(s.end!)}
+        </span>
+      ),
+    },
+    {
+      key: "duration",
+      header: "Duration",
+      align: "right",
+      sort: (s) => s.end! - s.start,
+      text: (s) => String(Math.floor((s.end! - s.start) / 60000)),
+      cell: (s) => <span className="font-semibold">{formatMinutes(Math.floor((s.end! - s.start) / 60000))}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sort: (s) => sessionStatus(s).label,
+      text: (s) => sessionStatus(s).label,
+      cell: (s) => <Pill tone={sessionStatus(s).tone}>{sessionStatus(s).label}</Pill>,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (s) => (
+        <span className="inline-flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button size="xs" variant="ghost" onClick={() => show(s)} aria-label={`View ${s.id}`}>
+            View
+          </Button>
+          <Button size="xs" variant="ghost" disabled={s.flag === "Correction pending"} onClick={() => setTarget(s)} aria-label={`Request correction for ${s.id}`}>
+            Correct
+          </Button>
+        </span>
+      ),
+    },
+  ];
 
   return (
     <Card id="history" className="scroll-mt-20">
-      <CardHeader title="Session history" description="Times are recorded when you press Start and End. To fix one, request a correction with a reason (Handbook §6)." />
-      {mine.length === 0 ? (
-        <EmptyState icon={<History />} title="No sessions yet" body="Your completed patrols will be listed here." />
-      ) : (
-        <>
-          <div className="overflow-x-auto border-t border-line">
-            <table className="w-full min-w-[640px] text-left text-xs whitespace-nowrap">
-              <thead className="sticky top-0 bg-surface-2 text-3xs text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-2 font-semibold">Date</th>
-                  <th scope="col" className="px-3 py-2 font-semibold">District</th>
-                  <th scope="col" className="px-3 py-2 font-semibold">Time</th>
-                  <th scope="col" className="px-3 py-2 text-right font-semibold">Duration</th>
-                  <th scope="col" className="px-3 py-2 font-semibold">Status</th>
-                  <th scope="col" className="px-4 py-2"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {mine.slice(0, limit).map((s) => {
-                  const mins = Math.floor((s.end! - s.start) / 60000);
-                  const req = state.requests.find((r) => r.sessionId === s.id && (r.state === "Submitted" || r.state === "Under review"));
-                  return (
-                    <tr key={s.id} className="hover:bg-surface-2">
-                      <td className="px-4 py-2.5">
-                        <span className="font-medium">{new Date(s.start).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-                        <span className="ml-2 text-3xs text-muted">{s.id}</span>
-                      </td>
-                      <td className="px-3 py-2.5">{s.district}</td>
-                      <td className="px-3 py-2.5 tabular text-ink-2">
-                        {time(s.start)}–{time(s.end!)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-semibold tabular">{formatMinutes(mins)}</td>
-                      <td className="px-3 py-2.5">
-                        {s.flag === "Correction pending" ? (
-                          <Link href={req ? `/hq/requests?id=${req.id}` : "/hq/requests"} className="hover:underline">
-                            <Pill tone="info">Correction pending</Pill>
-                          </Link>
-                        ) : s.flag === "Needs review" ? (
-                          <Pill tone="amber">Capped · needs review</Pill>
-                        ) : (
-                          <Pill tone="neutral">Recorded</Pill>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <Button size="xs" variant="ghost" disabled={s.flag === "Correction pending"} onClick={() => setTarget(s)}>
-                          Request correction
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {mine.length > limit ? (
-            <div className="border-t border-line px-4 py-2.5 text-center">
-              <Button size="xs" variant="ghost" onClick={() => setLimit((l) => l + 10)}>
-                Show more ({mine.length - limit})
-              </Button>
-            </div>
-          ) : null}
-        </>
-      )}
+      <CardHeader title="Session history" description="Times are recorded when you press Start and End. Select a session for details; corrections need a reason (Handbook §6)." />
+      <DataTable
+        label="Session history"
+        rows={mine}
+        columns={columns}
+        rowKey={(s) => s.id}
+        onRowClick={show}
+        activeKey={openId}
+        initialSort={{ key: "date", dir: "desc" }}
+        pageSize={8}
+        empty={<EmptyState icon={<History />} title="No sessions yet" body="Your completed patrols will be listed here." />}
+      />
+      <SessionDrawer session={open} state={state} onClose={hide} onRequestCorrection={setTarget} />
       <CorrectionDialog session={target} onClose={() => setTarget(null)} />
     </Card>
   );
@@ -452,7 +507,7 @@ function SupervisorsOnDuty({ state, now }: { state: PreviewState; now: number })
             <ShieldCheck className="size-4 text-gold-ink" aria-hidden /> Supervisors on duty
           </span>
         }
-        description="Pursuits need Sergeant+ authorization and an on-duty supervisor (Handbook §7)"
+        description="Sergeant and above with an open patrol session. Pursuits need Sergeant+ authorization (Handbook §7)"
       />
       {sups.length === 0 ? (
         <div className="border-t border-line px-4 py-3">
@@ -472,7 +527,7 @@ function SupervisorsOnDuty({ state, now }: { state: PreviewState; now: number })
                 </p>
               </div>
               <div className="text-right leading-tight">
-                <p className="text-3xs font-semibold text-gold-ink">{s.district}</p>
+                <p className="text-3xs font-semibold text-gold-ink">{s.district} District</p>
                 <p className="text-3xs text-muted tabular">{formatMinutes(Math.floor((now - s.start) / 60000))}</p>
               </div>
             </li>
@@ -502,11 +557,10 @@ export function Fleet() {
             <li key={v.name} className={cn("flex items-center gap-3 px-4 py-2", !ok && "opacity-55")}>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium">{v.name}</p>
-                <p className="truncate text-3xs text-muted">
-                  {v.model} · {v.use}
-                </p>
+                <p className="truncate text-3xs text-muted">In game: {v.model}</p>
+                <p className="truncate text-3xs text-muted">{v.use}</p>
               </div>
-              {ok ? <Pill tone="green">Yes</Pill> : <span className="text-3xs whitespace-nowrap text-muted">{v.minRank}+</span>}
+              {ok ? <Pill tone="green">Authorized</Pill> : <span className="text-3xs whitespace-nowrap text-muted">{v.minRank}+</span>}
             </li>
           );
         })}
@@ -555,10 +609,10 @@ function ConsoleSkeleton() {
     <Page wide>
       <Skeleton className="mb-2 h-3 w-16" />
       <Skeleton className="mb-6 h-7 w-56" />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-5">
           <Skeleton className="h-64 rounded-xl" />
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Skeleton className="h-52 rounded-lg" />
             <Skeleton className="h-52 rounded-lg" />
           </div>

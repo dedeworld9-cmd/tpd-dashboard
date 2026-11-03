@@ -75,3 +75,37 @@ export function roster(s: PreviewState, now: number): RosterRow[] {
 export function openRequests(s: PreviewState) {
   return s.requests.filter((r) => r.state === "Submitted" || r.state === "Under review");
 }
+
+/**
+ * Department metrics. One definition, used by the Command Center and the
+ * dashboard shortcut so the numbers always agree.
+ * - active: every member who is not suspended.
+ * - eligible: active members who are not exempt (leave, field training).
+ * - review: members with a session capped for review or a pending correction.
+ * - overdue: open requests past their due date.
+ */
+export function departmentMetrics(s: PreviewState, now: number) {
+  const rows = roster(s, now);
+  const active = rows.filter((r) => r.member.status !== "Suspended");
+  const eligible = active.filter((r) => r.band !== "exempt");
+  const open = openRequests(s);
+  const flagged = new Set(s.sessions.filter((x) => x.flag).map((x) => x.memberId));
+  return {
+    rows,
+    active: active.length,
+    onDuty: rows.filter((r) => r.onDuty).length,
+    eligible: eligible.length,
+    met: eligible.filter((r) => r.band === "met").length,
+    onTrack: eligible.filter((r) => r.band === "on-track").length,
+    atRisk: eligible.filter((r) => r.band === "at-risk").length,
+    exempt: active.length - eligible.length,
+    review: active.filter((r) => flagged.has(r.member.id)).length,
+    open: open.length,
+    overdue: open.filter((r) => r.dueAt !== null && r.dueAt < now).length,
+  };
+}
+
+/** Members with a flagged session (capped for review or correction pending). */
+export function needsReview(s: PreviewState, memberId: string) {
+  return s.sessions.some((x) => x.memberId === memberId && !!x.flag);
+}

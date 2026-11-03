@@ -100,3 +100,41 @@ describe("personnel administration", () => {
     await expect(settle(personnel.change("m-08", { callsign: "X-412" }, "Same as before"))).rejects.toThrow(/Nothing changed/);
   });
 });
+
+describe("security and concurrency", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetPreview();
+  });
+
+  it("refuses a decision on a stale record (concurrent reviewers)", async () => {
+    setRole("command");
+    const seen = getPreviewState().requests.find((x) => x.id === "REQ-1049")!.history.length;
+    // Another reviewer acts first.
+    await settle(requests.decide("REQ-1049", "Clarification requested", "Which unit and shift?"));
+    await expect(settle(requests.decide("REQ-1049", "Approved", "Approving on the old view", seen))).rejects.toThrow(/changed since you opened it/);
+    expect(await settle(requests.decide("REQ-1049", "Approved", "Reviewed the clarification.", seen + 1))).toBe("Approved");
+  });
+
+  it("refuses a decision on one's own request and on a decided request", async () => {
+    setRole("command");
+    const own = await settle(requests.create("Transfer", "To South", "Timezone fits South District better."));
+    await expect(settle(requests.decide(own.id, "Approved", "Approving my own"))).rejects.toThrow(/not authorized/);
+    await expect(settle(requests.decide("REQ-1042", "Denied", "Reversing an old decision"))).rejects.toThrow(/already approved/);
+  });
+
+  it("ignores manipulated payloads: unknown request, unknown decision target, other members' sessions", async () => {
+    setRole("supervisor");
+    await expect(settle(requests.decide("REQ-9999", "Approved", "Does not exist"))).rejects.toThrow(/no longer exists/);
+    const other = getPreviewState().sessions.find((s) => s.memberId === "m-07" && s.end !== null)!;
+    await expect(settle(requests.createCorrection(other.id, "Correcting someone else's session"))).rejects.toThrow(/own sessions/);
+    await expect(settle(requests.withdraw("REQ-1047"))).rejects.toThrow(/own requests/);
+  });
+
+  it("supervisors cannot decide LOA extensions; officers cannot change personnel", async () => {
+    setRole("supervisor");
+    await expect(settle(requests.decide("REQ-1051", "Approved", "Extension is fine"))).rejects.toThrow(/not authorized/);
+    setRole("officer");
+    await expect(settle(personnel.change("m-09", { rank: "Sergeant" }, "Self-service promotion"))).rejects.toThrow(/not authorized/);
+  });
+});

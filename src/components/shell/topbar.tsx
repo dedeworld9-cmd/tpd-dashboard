@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo } from "react";
-import { Bell, ChevronRight, ClipboardPlus, ExternalLink, FlaskConical, History, Menu, Play, Plus, Search, Square } from "lucide-react";
+import { useMemo, useSyncExternalStore } from "react";
+import { Bell, ChevronRight, ClipboardPlus, ExternalLink, FlaskConical, Gauge, GraduationCap, History, Menu, Play, Plus, Radio, Search, Square, Users } from "lucide-react";
+import { can } from "@/lib/authz";
 import { usePatrol } from "@/components/patrol/patrol-provider";
 import { Badge } from "@/components/ui/identity";
 import { IconButton } from "@/components/ui/button";
@@ -13,9 +14,15 @@ import { Dot } from "@/components/ui/status";
 import { cn } from "@/lib/cn";
 import { formatClock } from "@/lib/domain/activity";
 import { useMe, useNow } from "@/lib/preview/hooks";
-import { markNotificationsRead, notificationsFor, usePreviewState } from "@/lib/preview/store";
+import { markNotificationsRead, memberById, notificationsFor, usePreviewState } from "@/lib/preview/store";
 import { ANCHORCAD_URL, PAGES } from "./nav-config";
 import { useShell } from "./shell-context";
+
+const noop = () => () => {};
+/** "⌘K" on Apple platforms, "Ctrl K" elsewhere (server render assumes Ctrl). */
+function usePaletteKey() {
+  return useSyncExternalStore(noop, () => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K"), () => "Ctrl K");
+}
 
 function relative(at: number, now: number) {
   const m = Math.round((now - at) / 60000);
@@ -29,6 +36,7 @@ function relative(at: number, now: number) {
 export function Topbar() {
   const pathname = usePathname();
   const { openPalette, openDrawer } = useShell();
+  const paletteKey = usePaletteKey();
 
   const crumbs = useMemo(() => {
     const page = [...PAGES].sort((a, b) => b.href.length - a.href.length).find((p) => pathname === p.href || pathname.startsWith(`${p.href}/`));
@@ -37,6 +45,9 @@ export function Topbar() {
       const parent = page.parent ? PAGES.find((p) => p.href === page.parent) : null;
       if (parent) out.push({ href: parent.href, label: parent.label });
       out.push({ href: page.href, label: page.label });
+      const profile = pathname.match(/^\/hq\/roster\/([^/]+)$/);
+      const m = profile ? memberById(profile[1]) : undefined;
+      if (m) out.push({ href: pathname, label: m.name });
     }
     return out;
   }, [pathname]);
@@ -85,7 +96,7 @@ export function Topbar() {
         >
           <Search aria-hidden className="size-4" />
           <span className="flex-1 text-left">Search or jump to…</span>
-          <Kbd>Ctrl K</Kbd>
+          <Kbd>{paletteKey}</Kbd>
         </button>
         <IconButton label="Search" className="sm:hidden" onClick={openPalette}>
           <Search />
@@ -117,10 +128,15 @@ function DutyChip() {
   );
 }
 
+/** Contextual quick actions. Each entry runs the real operation; entries the user can't use are left out. */
 function QuickCreate() {
   const router = useRouter();
+  const me = useMe();
   const { openNewRequest } = useShell();
   const patrolApi = usePatrol();
+  const home = me?.member.district === "South" ? "South" : "North";
+  const onDuty = patrolApi.phase === "on-duty";
+  const go = (close: () => void, href: string) => (close(), router.push(href));
   return (
     <Popover
       label="Quick actions"
@@ -143,32 +159,48 @@ function QuickCreate() {
       {(close) => (
         <>
           <MenuLabel>Patrol</MenuLabel>
-          {patrolApi.phase === "on-duty" ? (
+          {onDuty ? (
             <MenuItem icon={<Square />} onSelect={() => (close(), patrolApi.requestEnd())}>
               End patrol…
             </MenuItem>
-          ) : (
-            <MenuItem icon={<Play />} disabled={!patrolApi.canStart || patrolApi.phase !== "idle"} hint={patrolApi.canStart ? undefined : "Not approved"} onSelect={() => (close(), router.push("/hq/patrol"))}>
-              Start patrol…
+          ) : patrolApi.canStart ? (
+            <MenuItem icon={<Play />} disabled={patrolApi.phase !== "idle"} onSelect={() => (close(), patrolApi.start(home))}>
+              Start patrol · {home}
             </MenuItem>
-          )}
-          <MenuItem icon={<History />} onSelect={() => (close(), router.push("/hq/patrol#history"))}>
-            Request activity correction
+          ) : null}
+          <MenuItem icon={<Radio />} onSelect={() => go(close, "/hq/patrol")}>
+            Open patrol
           </MenuItem>
-          <MenuItem icon={<ExternalLink />} disabled={!ANCHORCAD_URL} hint={ANCHORCAD_URL ? undefined : "Not configured"} onSelect={() => (close(), window.open(ANCHORCAD_URL, "_blank", "noopener"))}>
-            Open AnchorCAD
+          {ANCHORCAD_URL ? (
+            <MenuItem icon={<ExternalLink />} onSelect={() => (close(), window.open(ANCHORCAD_URL, "_blank", "noopener"))}>
+              Open AnchorCAD
+            </MenuItem>
+          ) : null}
+          <MenuSeparator />
+          <MenuLabel>Create</MenuLabel>
+          {me && can(me.actor, "request.create") ? (
+            <MenuItem icon={<ClipboardPlus />} hint="N" onSelect={() => (close(), openNewRequest())}>
+              New request…
+            </MenuItem>
+          ) : null}
+          <MenuItem icon={<History />} onSelect={() => go(close, "/hq/patrol#history")}>
+            Activity correction…
           </MenuItem>
           <MenuSeparator />
-          <MenuLabel>Requests</MenuLabel>
-          <MenuItem icon={<ClipboardPlus />} hint="N" onSelect={() => (close(), openNewRequest())}>
-            New request…
+          <MenuLabel>Go to</MenuLabel>
+          <MenuItem icon={<GraduationCap />} onSelect={() => go(close, "/hq/training")}>
+            Training
           </MenuItem>
-          <MenuItem icon={<ClipboardPlus />} onSelect={() => (close(), openNewRequest("Leave of absence"))}>
-            Leave of absence…
-          </MenuItem>
-          <MenuItem icon={<ClipboardPlus />} onSelect={() => (close(), openNewRequest("Division application"))}>
-            Division application…
-          </MenuItem>
+          {me && can(me.actor, "roster.view") ? (
+            <MenuItem icon={<Users />} onSelect={() => go(close, "/hq/roster")}>
+              Personnel
+            </MenuItem>
+          ) : null}
+          {me && can(me.actor, "command.view") ? (
+            <MenuItem icon={<Gauge />} onSelect={() => go(close, "/hq/command")}>
+              Command Center
+            </MenuItem>
+          ) : null}
         </>
       )}
     </Popover>

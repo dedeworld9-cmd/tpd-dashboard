@@ -93,6 +93,13 @@ const RULES: Record<Capability, (a: Actor) => boolean> = {
   "training.approve_independent": (a) => OOTC.includes(a.rank),
 };
 
+/** Human-readable access rule, kept beside RULES so the UI never restates it. */
+export const ACCESS_NOTE: Partial<Record<Capability, string>> = {
+  "command.view": "Captain and above (interim rule pending leadership, PC-08)",
+  "supervisor.view": "Sergeant and above",
+  "personnel.manage": "Captain and above (interim)",
+};
+
 export function can(actor: Actor | null | undefined, capability: Capability): boolean {
   if (!actor) return false;
   if (actor.status === "Suspended" || actor.status === "Separated") return false;

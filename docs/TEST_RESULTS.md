@@ -49,3 +49,17 @@ End-to-end coverage:
 Bugs found by these tests and fixed: patrol recovery state never cleared; clock showed milliseconds as seconds; a nested admin dialog closing also closed the personnel sheet (React propagates `close`); member profile had no page heading.
 
 Not yet tested: axe scan, screen readers, Safari and Firefox, real data, sign-in and server logic (not built yet).
+
+## Precision pass (Dashboard, Patrol, Command Center) · 2026-11-03 · branch `redesign-black-gold`
+
+Production build, headless Chromium. tsc and lint pass; build succeeds.
+
+| Suite | Result |
+|-------|--------|
+| Vitest | 28 / 28 pass (adds stale-decision refusal, self-decision, manipulated IDs, cross-member corrections and withdrawals, LOA-extension and personnel authorization) |
+| Playwright (desktop 1440, Pixel 7) | 27 / 27 pass (adds session drawer and sorting, dashboard identity and quick-action start, metric drill-downs, two-reviewer concurrency, mobile layout-width check) |
+| Browser QA | 17 screenshots: officer, probationary, supervisor (dark), command at 1440, 834 and Pixel 7; 0 console errors |
+
+Bugs found and fixed: dashboard table forced phones to zoom out (layout 491 px on a 412 px screen); patrol hero image reduced contrast behind actions; decision queue actions clipped at 1440 px.
+
+Limits: all data is the browser-local preview store. "Server-side" checks are the store's operation guards, which mirror the planned server contracts; they are not a server. Not yet tested: axe scan, screen readers, Safari and Firefox.
