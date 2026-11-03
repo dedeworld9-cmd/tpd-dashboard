@@ -26,6 +26,22 @@ Not done / limits
 | M5 | PC-06, PC-24 |
 | Assets | Official TPD badge/patch artwork, if any, and permission to use it |
 
+## Milestone 1 — Design system & shell · design complete, awaiting review (2026-11-03)
+
+Done
+- Next.js 15 (App Router, strict TS), Tailwind v4 tokens, light/dark themes, self-hosted Public Sans.
+- Public layout + homepage (join pathway from HB §3.1, divisions, districts, policy links, roleplay disclaimer).
+- HQ shell: collapsible sidebar, mobile drawer, top bar, universal search (Ctrl/⌘ K), theme toggle, duty chip.
+- Screens: Overview, Patrol, Personnel, Training, Division (6 routes), Command Center, Requests. Activity, Resources, Supervisor and Settings are labelled placeholders.
+- Browser QA: 8 routes × 1440/1024/768/390 px (light) + 1440/390 (dark); no horizontal overflow, no console errors. 13 interaction checks pass. See TEST_RESULTS.md.
+
+Deliberate limits
+- All HQ data is fictional (`src/lib/sample-data.ts`) and every HQ page shows a "design preview" banner.
+- The patrol timer runs in the browser only and records nothing; request decisions are disabled.
+- No authentication: `/hq` is open in this preview. Do not deploy publicly until Milestone 2 adds sign-in.
+- AnchorCAD link not configured (`NEXT_PUBLIC_ANCHORCAD_URL`); the button is disabled and says so.
+- No automated test suite in the repo yet (Vitest/Playwright arrive with M2 logic).
+
 ## Next
-Milestone 1: design system, public layout, HQ shell and eight representative screens,
-using fictional placeholder data clearly marked as such.
+Milestone 2: Discord sign-in, account linking, capability engine, personnel schema and roster import.
+Blocked on the external items above.
