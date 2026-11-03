@@ -565,11 +565,19 @@ function Announcements() {
           const external = a.href.startsWith("http");
           return (
             <li key={a.title}>
-              <a href={a.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="block px-4 py-3 transition-colors hover:bg-surface-2">
+              {external ? (
+                <a href={a.href} target="_blank" rel="noopener noreferrer" className="block px-4 py-3 transition-colors hover:bg-surface-2">
                 <p className="text-3xs font-semibold text-gold-ink">{a.date}</p>
                 <p className="mt-0.5 text-xs font-medium">{a.title}</p>
                 <p className="mt-0.5 line-clamp-2 text-3xs text-muted">{a.body}</p>
-              </a>
+                </a>
+              ) : (
+                <Link href={a.href} className="block px-4 py-3 transition-colors hover:bg-surface-2">
+                <p className="text-3xs font-semibold text-gold-ink">{a.date}</p>
+                <p className="mt-0.5 text-xs font-medium">{a.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-3xs text-muted">{a.body}</p>
+                </Link>
+              )}
             </li>
           );
         })}
