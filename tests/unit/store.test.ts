@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getPreviewState, notificationsFor, OperationError, patrol, requests, resetPreview, setRole } from "@/lib/preview/store";
+import { getPreviewState, memberById, notificationsFor, OperationError, patrol, personnel, requests, resetPreview, setRole } from "@/lib/preview/store";
 
 async function settle<T>(p: Promise<T>) {
   const out = p.then((v) => ({ v }), (e) => ({ e }));
@@ -73,5 +73,30 @@ describe("preview store operations", () => {
     const n = notificationsFor(getPreviewState());
     expect(n.some((x) => x.id.startsWith("REQ-1047:queue"))).toBe(true);
     expect(n.some((x) => x.id.startsWith("REQ-1049:queue"))).toBe(false); // division application needs Lt+
+  });
+});
+
+describe("personnel administration", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetPreview();
+  });
+
+  it("requires personnel.manage, a reason, and never self-service", async () => {
+    setRole("supervisor");
+    await expect(settle(personnel.change("m-09", { rank: "Corporal" }, "Good work all month"))).rejects.toThrow(/not authorized/);
+    setRole("command");
+    await expect(settle(personnel.change("m-03", { rank: "Captain" }, "Testing self change"))).rejects.toThrow(/own record/);
+    await expect(settle(personnel.change("m-09", { rank: "Corporal" }, "ok"))).rejects.toThrow(/reason/);
+    const entries = await settle(personnel.change("m-09", { rank: "Corporal" }, "Good work all month"));
+    expect(entries[0]).toMatchObject({ action: "Promotion", from: "Officer", to: "Corporal" });
+    expect(memberById("m-09")!.rank).toBe("Corporal");
+  });
+
+  it("enforces the three-subdivision limit and unique call signs", async () => {
+    setRole("command");
+    await expect(settle(personnel.change("m-08", { divisions: ["Waterfront Unit", "SWAT", "SWAT Two", "Fourth"] }, "Too many units"))).rejects.toThrow(/three subdivisions/);
+    await expect(settle(personnel.change("m-08", { callsign: "X-401" }, "Swap call signs"))).rejects.toThrow(/already assigned/);
+    await expect(settle(personnel.change("m-08", { callsign: "X-412" }, "Same as before"))).rejects.toThrow(/Nothing changed/);
   });
 });

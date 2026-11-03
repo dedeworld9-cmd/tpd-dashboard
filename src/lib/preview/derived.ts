@@ -3,8 +3,8 @@
  * so they can be unit tested and later re-pointed at server queries.
  */
 import { dailyMinutes, weekMinutes, weekStart, DEFAULT_WEEK, REQUIRED_MINUTES, type Interval } from "@/lib/domain/activity";
-import { MEMBERS, type Member } from "@/lib/sample-data";
-import type { PreviewState, SessionRecord } from "./store";
+import type { Member } from "@/lib/sample-data";
+import { allMembers, type PreviewState, type SessionRecord } from "./store";
 
 /** Closed sessions plus the open one counted up to `now`. */
 export function intervalsFor(sessions: SessionRecord[], memberId: string, now: number): Interval[] {
@@ -66,7 +66,7 @@ export interface RosterRow {
 }
 
 export function roster(s: PreviewState, now: number): RosterRow[] {
-  return MEMBERS.map((m) => {
+  return allMembers().map((m) => {
     const week = memberWeek(s, m.id, now);
     return { member: m, week, onDuty: s.sessions.find((x) => x.memberId === m.id && x.end === null) ?? null, band: band(m, week) };
   });

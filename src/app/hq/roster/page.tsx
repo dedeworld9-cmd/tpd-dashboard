@@ -1,21 +1,12 @@
-import { PageHeader } from "@/components/hq/page-header";
-import { RosterTable } from "@/components/hq/roster-table";
-import { Panel } from "@/components/ui/primitives";
-import { MEMBERS } from "@/lib/sample-data";
+import { Suspense } from "react";
+import { PersonnelWorkspace } from "@/components/personnel/personnel-workspace";
 
 export const metadata = { title: "Personnel" };
 
-export default async function RosterPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
+export default function RosterPage() {
   return (
-    <>
-      <PageHeader
-        title="Personnel"
-        description="The department roster. Rank, district and division assignments come from the official roster."
-      />
-      <Panel className="overflow-hidden">
-        <RosterTable members={MEMBERS} initialQuery={q ?? ""} />
-      </Panel>
-    </>
+    <Suspense>
+      <PersonnelWorkspace />
+    </Suspense>
   );
 }

@@ -254,7 +254,7 @@ function LockedConsole() {
 
 // ---------------------------------------------------------------- analytics
 
-function WeekProgress({ state, now, week }: { state: PreviewState; now: number; week: number }) {
+export function WeekProgress({ state, now, week }: { state: PreviewState; now: number; week: number }) {
   const me = useMe()!;
   const daily = memberDaily(state, me.member.id, now);
   const today = (new Date(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now)).getDay() + 6) % 7;
@@ -271,7 +271,7 @@ function WeekProgress({ state, now, week }: { state: PreviewState; now: number; 
   );
 }
 
-function Trend({ state, now }: { state: PreviewState; now: number }) {
+export function Trend({ state, now }: { state: PreviewState; now: number }) {
   const me = useMe()!;
   const trend = memberTrend(state, me.member.id, now, 6);
   const met = trend.filter((t) => t.minutes >= REQUIRED_MINUTES).length;
@@ -287,7 +287,7 @@ function Trend({ state, now }: { state: PreviewState; now: number }) {
 
 // ---------------------------------------------------------------- history + corrections
 
-function SessionHistory({ state }: { state: PreviewState }) {
+export function SessionHistory({ state }: { state: PreviewState }) {
   const me = useMe()!;
   const [target, setTarget] = useState<SessionRecord | null>(null);
   const mine = state.sessions.filter((s) => s.memberId === me.member.id && s.end !== null).sort((a, b) => b.start - a.start);
@@ -483,7 +483,7 @@ function SupervisorsOnDuty({ state, now }: { state: PreviewState; now: number })
   );
 }
 
-function Fleet() {
+export function Fleet() {
   const me = useMe()!;
   return (
     <Card>
@@ -515,7 +515,7 @@ function Fleet() {
   );
 }
 
-function PolicyRefs() {
+export function PolicyRefs() {
   const refs = [
     { s: "§3.2", t: "Weekly activity: 3 documented hours" },
     { s: "§6", t: "Log shift start and end accurately" },

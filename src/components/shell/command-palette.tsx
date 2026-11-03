@@ -27,9 +27,9 @@ import { Segmented } from "@/components/ui/tabs";
 import { can } from "@/lib/authz";
 import { cn } from "@/lib/cn";
 import { useMe } from "@/lib/preview/hooks";
-import { ROLE_PERSONA, setRole, usePreview, type PatrolDistrict, type PreviewRole } from "@/lib/preview/store";
+import { allMembers, ROLE_PERSONA, setRole, usePreview, type PatrolDistrict, type PreviewRole } from "@/lib/preview/store";
 import { HANDBOOK_URL, USE_OF_FORCE_URL } from "@/lib/public-nav";
-import { DIVISIONS, MEMBERS } from "@/lib/sample-data";
+import { DIVISIONS } from "@/lib/sample-data";
 import { ANCHORCAD_URL, PAGES } from "./nav-config";
 import { useShell } from "./shell-context";
 import { toggleTheme } from "./theme";
@@ -140,7 +140,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     for (const p of pages.filter((p) => !p.parent)) out.push({ id: `p-${p.href}`, group: "Pages", label: p.label, hint: p.href.replace("/hq", "") || "/", icon: FileText, run: go(p.href) });
     for (const d of DIVISIONS) out.push({ id: `d-${d.slug}`, group: "Divisions", label: d.name, hint: d.callsign ? `${d.callsign} · ${d.prefix}` : d.prefix, icon: Building2, run: go(`/hq/divisions/${d.slug}`) });
     if (can(me.actor, "roster.view")) {
-      for (const m of MEMBERS) out.push({ id: `m-${m.id}`, group: "Personnel", label: m.name, hint: `${m.callsign} · ${m.rank}`, avatar: m.name, keywords: `${m.district} ${m.divisions.join(" ")}`, run: go(`/hq/roster?member=${m.id}`) });
+      for (const m of allMembers()) out.push({ id: `m-${m.id}`, group: "Personnel", label: m.name, hint: `${m.callsign} · ${m.rank}`, avatar: m.name, keywords: `${m.district} ${m.divisions.join(" ")}`, run: go(`/hq/roster?member=${m.id}`) });
     }
     out.push({ id: "pol-hb", group: "Policies", label: "Personnel Handbook", icon: BookOpen, keywords: "policy hb", external: true, run: () => (onClose(), window.open(HANDBOOK_URL, "_blank", "noopener")) });
     out.push({ id: "pol-uof", group: "Policies", label: "Use of Force Policy", icon: BookOpen, keywords: "policy uof", external: true, run: () => (onClose(), window.open(USE_OF_FORCE_URL, "_blank", "noopener")) });

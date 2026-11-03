@@ -46,7 +46,7 @@ Deliberate limits
 Milestone 2: Discord sign-in, account linking, capability engine, personnel schema and roster import.
 Blocked on the external items above.
 
-## Redesign — black-and-gold system and reference screens · in progress (2026-11-03)
+## Redesign — black-and-gold system · complete in development, awaiting review (2026-11-03)
 
 dede rejected the Milestone 1 look and issued two directives (design reformation; advanced UI/UX and interaction). Work so far:
 
@@ -60,6 +60,13 @@ Done
 - Reference screens: Member Dashboard (adapts to off duty, on duty, probationary, supervisor, command), Active Patrol workspace (start, recover, end with confirmation, weekly progress, six-week trend, history with corrections, supervisors on duty, fleet, policy refs), Command Center (KPIs, staffing, compliance, division capacity, decision queue with saved views and filters, approval panel). Requests workspace rebuilt on the same table and panel.
 - Tests: 22 unit (authz, week math incl. DST, store operations) and 16 Playwright end-to-end. See TEST_RESULTS.md.
 
+Also done
+- Public homepage: obsidian hero with the badge and Charger photo, HB §2 values, HB §3.1 recruitment pathway, stats band on the skyline banner (2 districts, 6 divisions, 134 sworn slots from the official sheet), districts, divisions, leadership by rank (no names: the repo is public), services (HB §12.1, §14.1), announcements, policy links, banner footer. Roleplay disclaimer kept as the first line.
+- Personnel: data table with filters and export, side panel, full profile page, admin actions (rank, district, divisions, call sign, status) that show gained or lost access, vehicles and exemptions before confirming, require a reason, block self-edits and write an audit history.
+- Activity, Training, Divisions (overview and each division), Supervisor desk (gated), Resources (fleet matrix), Settings rebuilt on the new system.
+- Tests: 24 unit and 23 end-to-end, all passing. See TEST_RESULTS.md. Screenshots in the project files (`redesign/`).
+
 Remaining
-- Public homepage rebuild; Personnel (side panel + admin flows), Training, Divisions, Activity, Supervisor, Resources and Settings on the new system.
-- Not deployed. Awaiting dede's review.
+- dede's review of the design. Not deployed, and must not be until dede approves the design and the release.
+- Milestone 2 blockers are unchanged: Discord application, Supabase project, AnchorCAD URL, and policy conflicts PC-06, 07, 08, 14 and 16.
+- The badge source is 207×265 px; a higher-resolution original would sharpen the hero.

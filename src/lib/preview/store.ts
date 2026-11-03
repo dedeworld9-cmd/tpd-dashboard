@@ -14,7 +14,7 @@
 import { useSyncExternalStore } from "react";
 import { can, canDecide, type Actor, type RequestType } from "@/lib/authz";
 import { STALE_SESSION_MS } from "@/lib/domain/activity";
-import { MEMBERS, type District, type Member, type RequestState } from "@/lib/sample-data";
+import { MEMBERS, RANKS, type District, type Member, type RequestState } from "@/lib/sample-data";
 
 export type PreviewRole = "officer" | "probationary" | "supervisor" | "command";
 
@@ -65,10 +65,26 @@ export interface PreviewState {
   requests: RequestRecord[];
   readNotifications: string[];
   recents: string[];
+  /** Admin changes applied on top of the sample roster. */
+  personnel: Record<string, Partial<Member>>;
+  /** Append-only record of personnel actions. */
+  audit: AuditEntry[];
 }
 
+export interface AuditEntry {
+  at: number;
+  actor: string;
+  memberId: string;
+  action: PersonnelAction;
+  from: string;
+  to: string;
+  reason: string;
+}
+
+export type PersonnelAction = "Promotion" | "Demotion" | "Transfer" | "Divisions" | "Call sign" | "Status";
+
 const KEY = "tpd-preview-state";
-const VERSION = 4;
+const VERSION = 5;
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 
@@ -152,7 +168,7 @@ function seed(now: number): PreviewState {
     ] }),
   ];
 
-  return { version: VERSION, role: "officer", sessions, requests, readNotifications: [], recents: [] };
+  return { version: VERSION, role: "officer", sessions, requests, readNotifications: [], recents: [], personnel: {}, audit: [] };
 }
 
 // ---------------------------------------------------------------- store core
@@ -228,7 +244,14 @@ export function resetPreview() {
 // ---------------------------------------------------------------- selectors
 
 export function memberById(id: string): Member | undefined {
-  return MEMBERS.find((m) => m.id === id);
+  const base = MEMBERS.find((m) => m.id === id);
+  const o = state?.personnel?.[id];
+  return base && o ? { ...base, ...o } : base;
+}
+
+/** The roster with admin changes applied. */
+export function allMembers(): Member[] {
+  return MEMBERS.map((m) => memberById(m.id)!);
 }
 
 export function actorFor(member: Member): Actor {
@@ -401,6 +424,61 @@ export const requests = {
         sessions: st.sessions.map((x) => (x.id === sessionId ? { ...x, flag: "Correction pending" } : x)),
       }));
       return record;
+    });
+  },
+};
+
+// ---------------------------------------------------------------- personnel administration
+
+export interface PersonnelChange {
+  rank?: Member["rank"];
+  district?: Member["district"];
+  divisions?: string[];
+  callsign?: string;
+  status?: Member["status"];
+}
+
+/**
+ * Applies one personnel change. Requires `personnel.manage`, a reason, and
+ * never lets an administrator change their own record. Every change is
+ * appended to the audit log with its before and after values.
+ */
+export const personnel = {
+  change(memberId: string, change: PersonnelChange, reason: string) {
+    return guarded(`personnel:${memberId}`, () => {
+      const s = load();
+      const me = currentMember(s);
+      if (!can(actorFor(me), "personnel.manage")) throw new OperationError("You are not authorized to change personnel records.");
+      if (memberId === me.id) throw new OperationError("You can’t change your own record. Another administrator must do it.");
+      const target = memberById(memberId);
+      if (!target) throw new OperationError("This member no longer exists.");
+      if (reason.trim().length < 5) throw new OperationError("Record a reason of at least a few words.");
+      const entries: AuditEntry[] = [];
+      const now = Date.now();
+      const push = (action: PersonnelAction, from: string, to: string) => entries.push({ at: now, actor: me.id, memberId, action, from, to, reason: reason.trim() });
+      if (change.rank && change.rank !== target.rank) {
+        push(RANKS.indexOf(change.rank) < RANKS.indexOf(target.rank) ? "Promotion" : "Demotion", target.rank, change.rank);
+      }
+      if (change.district && change.district !== target.district) push("Transfer", target.district, change.district);
+      if (change.divisions) {
+        if (change.divisions.length > 3) throw new OperationError("Members may hold at most three subdivisions (Handbook §9.3).");
+        const before = [...target.divisions].sort().join(", ") || "None";
+        const after = [...change.divisions].sort().join(", ") || "None";
+        if (before !== after) push("Divisions", before, after);
+      }
+      if (change.callsign && change.callsign !== target.callsign) {
+        if (!/^X-\d{3}$/.test(change.callsign)) throw new OperationError("Department call signs look like X-123.");
+        if (allMembers().some((m) => m.id !== memberId && m.callsign === change.callsign)) throw new OperationError(`${change.callsign} is already assigned.`);
+        push("Call sign", target.callsign, change.callsign);
+      }
+      if (change.status && change.status !== target.status) push("Status", target.status, change.status);
+      if (!entries.length) throw new OperationError("Nothing changed.");
+      set((st) => ({
+        ...st,
+        personnel: { ...st.personnel, [memberId]: { ...st.personnel[memberId], ...change } },
+        audit: [...entries, ...st.audit],
+      }));
+      return entries;
     });
   },
 };

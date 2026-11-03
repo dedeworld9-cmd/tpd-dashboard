@@ -315,7 +315,7 @@ function MyRequests({ state }: { state: PreviewState }) {
   );
 }
 
-function ReviewQueue({ state }: { state: PreviewState }) {
+export function ReviewQueue({ state }: { state: PreviewState }) {
   const me = useMe()!;
   const isCommand = can(me.actor, "command.view");
   const queue = openRequests(state)
@@ -421,7 +421,7 @@ function FleetCard() {
 
 // ---------------------------------------------------------------- supervisor / command
 
-function DistrictBoard({ state, now, district }: { state: PreviewState; now: number; district: string }) {
+export function DistrictBoard({ state, now, district }: { state: PreviewState; now: number; district: string }) {
   const rows = roster(state, now).filter((r) => district === "Department" || r.member.district === district);
   const onDuty = rows.filter((r) => r.onDuty);
   const me = useMe()!;

@@ -39,7 +39,8 @@ export function Dialog({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={onClose}
+      // React propagates a nested dialog's close event to its ancestors; only react to our own.
+      onClose={(e) => e.target === ref.current && onClose()}
       onClick={(e) => e.target === ref.current && onClose()}
       className={cn(
         "m-auto w-[calc(100%-2rem)] rounded-xl border border-line bg-surface p-0 text-ink shadow-lg open:animate-pop-in backdrop:animate-fade-in",
@@ -92,7 +93,8 @@ export function Sheet({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={onClose}
+      // React propagates a nested dialog's close event to its ancestors; only react to our own.
+      onClose={(e) => e.target === ref.current && onClose()}
       onClick={(e) => e.target === ref.current && onClose()}
       className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-full border-l border-line bg-surface p-0 text-ink shadow-lg open:flex open:flex-col open:animate-sheet-in backdrop:animate-fade-in sm:max-w-[480px]"
     >

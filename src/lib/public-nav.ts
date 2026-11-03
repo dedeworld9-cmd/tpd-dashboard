@@ -1,7 +1,8 @@
 export const PUBLIC_NAV = [
-  { href: "/#divisions", label: "Divisions" },
+  { href: "/#about", label: "About" },
   { href: "/#districts", label: "Districts" },
-  { href: "/#standards", label: "Policies" },
+  { href: "/#divisions", label: "Divisions" },
+  { href: "/#policies", label: "Policies" },
   { href: "/#join", label: "Join" },
 ];
 
