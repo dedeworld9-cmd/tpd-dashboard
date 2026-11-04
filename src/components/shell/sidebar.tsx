@@ -10,6 +10,7 @@ import {
   ChevronsUpDown,
   Globe,
   Keyboard,
+  LogIn,
   LogOut,
   Monitor,
   Moon,
@@ -25,6 +26,7 @@ import { Dot } from "@/components/ui/status";
 import { Skeleton, toast } from "@/components/ui/feedback";
 import { usePatrol } from "@/components/patrol/patrol-provider";
 import { can } from "@/lib/authz";
+import { useAuth } from "@/lib/backend/auth";
 import { cn } from "@/lib/cn";
 import { formatClock } from "@/lib/domain/activity";
 import { useMe, useNow } from "@/lib/preview/hooks";
@@ -308,6 +310,7 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
   const me = useMe();
   const theme = useTheme();
   const { openShortcuts } = useShell();
+  const auth = useAuth();
   if (!me) return <Skeleton className="h-11 w-full opacity-20" />;
   const roles = Object.keys(ROLE_PERSONA) as PreviewRole[];
 
@@ -414,12 +417,24 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
           >
             Reset preview data
           </MenuItem>
-          <MenuItem icon={<ArrowLeftRight />} disabled hint="M2" onSelect={() => {}}>
-            Switch Discord account
-          </MenuItem>
-          <MenuItem icon={<LogOut />} disabled hint="M2" onSelect={() => {}}>
-            Sign out
-          </MenuItem>
+          {auth.status === "disabled" ? (
+            <MenuItem icon={<LogOut />} disabled hint="Not configured" onSelect={() => {}}>
+              Discord sign-in
+            </MenuItem>
+          ) : auth.session ? (
+            <>
+              <MenuItem icon={<ArrowLeftRight />} onSelect={() => (close(), auth.signOut().then(auth.signIn))}>
+                Switch Discord account
+              </MenuItem>
+              <MenuItem icon={<LogOut />} onSelect={() => (close(), auth.signOut())}>
+                Sign out
+              </MenuItem>
+            </>
+          ) : (
+            <MenuItem icon={<LogIn />} onSelect={() => (close(), auth.signIn())}>
+              Sign in with Discord
+            </MenuItem>
+          )}
         </>
       )}
     </Popover>

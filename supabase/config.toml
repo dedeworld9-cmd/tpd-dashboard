@@ -1,0 +1,18 @@
+# Supabase CLI project settings for the parts this repository defines.
+# project_id is set by `supabase link`; it is not a secret.
+
+[auth.external.discord]
+enabled = true
+client_id = "env(DISCORD_CLIENT_ID)"
+secret = "env(DISCORD_CLIENT_SECRET)"
+
+[functions.roster-sync]
+# Scheduled runs authenticate with x-sync-secret instead of a user token; user calls are
+# still verified inside the function (Supabase Auth + is_command()).
+verify_jwt = false
+
+[functions.discord-verify]
+verify_jwt = true
+
+[functions.integration-health]
+verify_jwt = true

@@ -8,6 +8,7 @@ import { PatrolProvider } from "@/components/patrol/patrol-provider";
 import { Dialog } from "@/components/ui/overlay";
 import { Kbd } from "@/components/ui/field";
 import { Toaster } from "@/components/ui/feedback";
+import { AuthProvider } from "@/lib/backend/auth";
 import { cn } from "@/lib/cn";
 import { pushRecent } from "@/lib/preview/store";
 import { CommandPalette } from "./command-palette";
@@ -26,10 +27,12 @@ function isTyping(t: EventTarget | null) {
 
 export function HqShell({ children }: { children: ReactNode }) {
   return (
-    <PatrolProvider>
-      <ShellInner>{children}</ShellInner>
-      <Toaster />
-    </PatrolProvider>
+    <AuthProvider>
+      <PatrolProvider>
+        <ShellInner>{children}</ShellInner>
+        <Toaster />
+      </PatrolProvider>
+    </AuthProvider>
   );
 }
 

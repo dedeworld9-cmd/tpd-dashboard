@@ -85,3 +85,19 @@ Done
 Never copied (restricted): Discord IDs, Roblox usernames, timezones, hire and resignation dates, disciplinary points, TPD | Records.
 
 Open: PC-26 to PC-29 (docs/POLICY_CONFLICTS.md). Names on the public site await dede's decision (PC-29). Not deployed: the gh-pages preview still shows the previous build.
+
+## Phase 2: real integrations · code complete, not activated (2026-11-04)
+
+See docs/INTEGRATIONS.md for the architecture, activation steps and tests.
+
+Implemented and tested without credentials
+- Supabase schema with RLS, membership states and an atomic, validated roster snapshot apply. Tested on a local PostgreSQL 16 with a stub auth schema (`supabase/tests`).
+- Edge Functions `roster-sync`, `discord-verify` and `integration-health` (Deno, no third-party imports, `deno check` passes), with shared logic unit-tested in Vitest: 39 integration tests.
+- Website: Discord sign-in through Supabase Auth with PKCE, callback page, membership states, verified identity card on the dashboard, sign-in and sign-out in the account menu, Command Center → Integrations (health, sync preview and apply, read-only member verification), and AnchorCAD launch-URL validation.
+
+Blocked on credentials (nothing is connected)
+- Supabase project; Discord application and bot plus guild ID; Google service account with Viewer access; AnchorCAD panel URL and an optional API key.
+- Discord role mapping: the server's roles have not been seen, so no mapping exists, and none is enforced until leadership confirms it.
+- AnchorCAD member matching, report references and duty sync are unsupported, because the API response fields are undocumented.
+
+Not deployed: the live preview does not include Phase 2.

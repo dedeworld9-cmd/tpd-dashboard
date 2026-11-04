@@ -228,6 +228,11 @@ function CommandInner({ state, now }: { state: PreviewState; now: number }) {
             <Pill tone="amber">Access: {ACCESS_NOTE["command.view"]}</Pill>
           </>
         }
+        actions={
+          <ButtonLink href="/hq/command/integrations" variant="secondary">
+            Integrations
+          </ButtonLink>
+        }
       />
 
       <Kpis state={state} now={now} />

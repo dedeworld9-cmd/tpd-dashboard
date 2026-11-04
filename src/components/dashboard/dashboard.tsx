@@ -10,6 +10,7 @@ import { HANDBOOK_URL } from "@/lib/public-nav";
 import { usePatrol } from "@/components/patrol/patrol-provider";
 import { useShell } from "@/components/shell/shell-context";
 import { Page } from "@/components/shell/page";
+import { VerifiedIdentity } from "@/components/auth/verified-identity";
 import { ANCHORCAD_URL } from "@/components/shell/nav-config";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { HourMeter } from "@/components/ui/data-viz";
@@ -66,6 +67,9 @@ export function Dashboard() {
           </ul>
         ) : null}
       </header>
+      <div className="mb-5 empty:hidden">
+        <VerifiedIdentity />
+      </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] xl:gap-6">
         <div className="flex min-w-0 flex-col gap-5 xl:gap-6">

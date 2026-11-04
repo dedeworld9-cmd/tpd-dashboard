@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { Capability } from "@/lib/authz";
 import { DIVISIONS } from "@/lib/department";
+import { checkPanelUrl } from "../../../supabase/functions/_shared/anchorcad.ts";
 
 export interface NavLeaf {
   href: string;
@@ -59,7 +60,7 @@ export const NAV: NavGroup[] = [
     label: "Management",
     items: [
       { href: "/hq/supervisor", label: "Supervisor", icon: ShieldCheck, capability: "supervisor.view" },
-      { href: "/hq/command", label: "Command Center", icon: Gauge, capability: "command.view", shortcut: "G C" },
+      { href: "/hq/command", label: "Command Center", icon: Gauge, capability: "command.view", shortcut: "G C", children: [{ href: "/hq/command/integrations", label: "Integrations" }] },
     ],
   },
 ];
@@ -80,4 +81,6 @@ export const PAGES: { href: string; label: string; parent?: string; capability?:
 export const GO_TO: Record<string, string> = { o: "/hq", p: "/hq/patrol", a: "/hq/activity", t: "/hq/training", m: "/hq/roster", s: "/hq/structure", r: "/hq/requests", c: "/hq/command" };
 
 /** AnchorCAD is the department's official reporting system (HB §10). No API integration exists. */
-export const ANCHORCAD_URL = process.env.NEXT_PUBLIC_ANCHORCAD_URL ?? "";
+export const ANCHORCAD_PANEL = checkPanelUrl(process.env.NEXT_PUBLIC_ANCHORCAD_URL);
+/** Launch link, only when it is https on an official AnchorCAD domain; otherwise "" and the UI says it is not configured. */
+export const ANCHORCAD_URL = ANCHORCAD_PANEL.status === "connected" ? (ANCHORCAD_PANEL.url ?? "") : "";
