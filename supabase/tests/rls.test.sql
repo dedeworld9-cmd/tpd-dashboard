@@ -20,13 +20,13 @@ end $$;
 -- 1. Before any import: membership is "unavailable", not "unrecognized" or verified.
 set role authenticated;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
-do $$ begin assert (public.my_membership() ->> 'state') = 'unavailable', 'state before import'; end $$;
+do $$ begin assert (tpd.my_membership() ->> 'state') = 'unavailable', 'state before import'; end $$;
 reset role;
 
 -- 2. Apply a snapshot as the sync function would.
-insert into public.roster_sync_runs (id, trigger, status, finished_at) values ('00000000-0000-0000-0000-0000000000f1', 'manual', 'applied', now());
+insert into tpd.roster_sync_runs (id, trigger, status, finished_at) values ('00000000-0000-0000-0000-0000000000f1', 'manual', 'applied', now());
 set role service_role;
-select public.apply_roster_snapshot($j${
+select tpd.apply_roster_snapshot($j${
   "members": [
     {"discordId": "100000000000000001", "name": "A. Chief", "callsign": "X-101", "rank": "Chief of Police", "appointment": "Overall Operations", "tier": "Office of the Chiefs", "district": null, "timezone": "EST"},
     {"discordId": "100000000000000002", "name": "B. Officer", "callsign": "X-425", "rank": "Officer", "appointment": "Patrol Bureau", "tier": "Patrol Bureau", "district": "North", "timezone": "PST"},
@@ -42,15 +42,15 @@ select public.apply_roster_snapshot($j${
 }$j$::jsonb, '00000000-0000-0000-0000-0000000000f1');
 reset role;
 do $$ begin
-  assert (select count(*) from public.personnel) = 3, 'vacant slot must not create personnel';
-  assert (select count(*) from public.positions where personnel_id is null) = 1, 'vacant slot kept';
+  assert (select count(*) from tpd.personnel) = 3, 'vacant slot must not create personnel';
+  assert (select count(*) from tpd.positions where personnel_id is null) = 1, 'vacant slot kept';
 end $$;
 
 -- 3. Anonymous visitors read nothing.
 set role anon;
 do $$ declare n int; begin
-  begin select count(*) into n from public.personnel; raise exception 'anon read personnel'; exception when insufficient_privilege then null; end;
-  begin select count(*) into n from public.audit_log; raise exception 'anon read audit'; exception when insufficient_privilege then null; end;
+  begin select count(*) into n from tpd.personnel; raise exception 'anon read personnel'; exception when insufficient_privilege then null; end;
+  begin select count(*) into n from tpd.audit_log; raise exception 'anon read audit'; exception when insufficient_privilege then null; end;
 end $$;
 reset role;
 
@@ -58,50 +58,50 @@ reset role;
 set role authenticated;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 do $$ begin
-  assert (select count(*) from public.personnel) = 1, 'officer sees only self';
-  assert (select discord_id from public.personnel) = '100000000000000002', 'own row';
-  assert (select count(*) from public.personnel_directory) = 3, 'directory visible to members';
+  assert (select count(*) from tpd.personnel) = 1, 'officer sees only self';
+  assert (select discord_id from tpd.personnel) = '100000000000000002', 'own row';
+  assert (select count(*) from tpd.personnel_directory) = 3, 'directory visible to members';
   assert not exists (select 1 from information_schema.columns where table_name = 'personnel_directory' and column_name in ('discord_id', 'timezone')), 'directory leaks identifiers';
-  assert (select count(*) from public.roster_sync_runs) = 0, 'officer reads sync runs';
-  assert (select count(*) from public.audit_log) = 0, 'officer reads audit';
-  assert (select count(*) from public.integration_status) = 0, 'officer reads integration status';
-  assert not public.is_command(), 'officer is not command';
-  assert (public.my_membership() ->> 'state') = 'verified', 'officer verified';
-  assert (public.my_membership() -> 'member' -> 'divisions' -> 0 ->> 'callsign') = 'W-12', 'division membership';
+  assert (select count(*) from tpd.roster_sync_runs) = 0, 'officer reads sync runs';
+  assert (select count(*) from tpd.audit_log) = 0, 'officer reads audit';
+  assert (select count(*) from tpd.integration_status) = 0, 'officer reads integration status';
+  assert not tpd.is_command(), 'officer is not command';
+  assert (tpd.my_membership() ->> 'state') = 'verified', 'officer verified';
+  assert (tpd.my_membership() -> 'member' -> 'divisions' -> 0 ->> 'callsign') = 'W-12', 'division membership';
 end $$;
 
 -- 5. Writes are refused for signed-in users, including self-promotion.
 do $$ begin
-  begin update public.personnel set rank = 'Chief of Police'; raise exception 'self promotion allowed'; exception when insufficient_privilege then null; end;
-  begin insert into public.audit_log (actor, action) values ('x', 'y'); raise exception 'audit insert allowed'; exception when insufficient_privilege then null; end;
-  begin perform public.apply_roster_snapshot('{}'::jsonb, gen_random_uuid()); raise exception 'apply allowed'; exception when insufficient_privilege then null; end;
+  begin update tpd.personnel set rank = 'Chief of Police'; raise exception 'self promotion allowed'; exception when insufficient_privilege then null; end;
+  begin insert into tpd.audit_log (actor, action) values ('x', 'y'); raise exception 'audit insert allowed'; exception when insufficient_privilege then null; end;
+  begin perform tpd.apply_roster_snapshot('{}'::jsonb, gen_random_uuid()); raise exception 'apply allowed'; exception when insufficient_privilege then null; end;
 end $$;
 
 -- 6. Command sees everything readable; no write rights either.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 do $$ begin
-  assert public.is_command(), 'chief is command';
-  assert (select count(*) from public.personnel) = 3, 'command reads personnel';
-  assert (select count(*) from public.roster_sync_runs) = 1, 'command reads sync runs';
-  begin delete from public.personnel; raise exception 'command delete allowed'; exception when insufficient_privilege then null; end;
+  assert tpd.is_command(), 'chief is command';
+  assert (select count(*) from tpd.personnel) = 3, 'command reads personnel';
+  assert (select count(*) from tpd.roster_sync_runs) = 1, 'command reads sync runs';
+  begin delete from tpd.personnel; raise exception 'command delete allowed'; exception when insufficient_privilege then null; end;
 end $$;
 
 -- 7. Unrecognized and identity-less users get no member access.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 do $$ begin
-  assert (public.my_membership() ->> 'state') = 'unrecognized', 'stranger state';
-  assert (select count(*) from public.personnel_directory) = 0, 'stranger reads directory';
-  assert (select count(*) from public.positions) = 0, 'stranger reads positions';
+  assert (tpd.my_membership() ->> 'state') = 'unrecognized', 'stranger state';
+  assert (select count(*) from tpd.personnel_directory) = 0, 'stranger reads directory';
+  assert (select count(*) from tpd.positions) = 0, 'stranger reads positions';
 end $$;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
-do $$ begin assert (public.my_membership() ->> 'state') = 'pending_verification', 'no discord identity'; end $$;
+do $$ begin assert (tpd.my_membership() ->> 'state') = 'pending_verification', 'no discord identity'; end $$;
 select pg_temp.as_user(null);
-do $$ begin assert (public.my_membership() ->> 'state') = 'signed_out', 'signed out'; end $$;
+do $$ begin assert (tpd.my_membership() ->> 'state') = 'signed_out', 'signed out'; end $$;
 reset role;
 
 -- 8. A member removed from the roster becomes former and loses access; callsign is freed.
 set role service_role;
-select public.apply_roster_snapshot($j${
+select tpd.apply_roster_snapshot($j${
   "members": [
     {"discordId": "100000000000000001", "name": "A. Chief", "callsign": "X-101", "rank": "Chief of Police", "appointment": "Overall Operations", "tier": "Office of the Chiefs", "district": null, "timezone": "EST"},
     {"discordId": "100000000000000002", "name": "B. Officer", "callsign": "X-426", "rank": "Corporal", "appointment": "Patrol Aide", "tier": "Patrol Bureau", "district": "South", "timezone": "PST"}
@@ -110,23 +110,23 @@ select public.apply_roster_snapshot($j${
 }$j$::jsonb, '00000000-0000-0000-0000-0000000000f1');
 reset role;
 do $$ begin
-  assert (select status from public.personnel where discord_id = '100000000000000003') = 'former', 'removed member former';
-  assert (select callsign from public.personnel where discord_id = '100000000000000003') is null, 'callsign freed';
-  assert (select rank || '/' || callsign || '/' || district from public.personnel where discord_id = '100000000000000002') = 'Corporal/X-426/South', 'rank, callsign, district change applied';
+  assert (select status from tpd.personnel where discord_id = '100000000000000003') = 'former', 'removed member former';
+  assert (select callsign from tpd.personnel where discord_id = '100000000000000003') is null, 'callsign freed';
+  assert (select rank || '/' || callsign || '/' || district from tpd.personnel where discord_id = '100000000000000002') = 'Corporal/X-426/South', 'rank, callsign, district change applied';
 end $$;
 
 -- 9. A malformed or empty snapshot is refused and nothing changes.
 set role service_role;
 do $$ begin
-  begin perform public.apply_roster_snapshot('{"members": [], "positions": []}'::jsonb, gen_random_uuid()); raise exception 'empty snapshot applied'; exception when raise_exception then
+  begin perform tpd.apply_roster_snapshot('{"members": [], "positions": []}'::jsonb, gen_random_uuid()); raise exception 'empty snapshot applied'; exception when raise_exception then
     if sqlerrm like '%empty snapshot applied%' then raise; end if; end;
-  begin perform public.apply_roster_snapshot($j${"members": [{"discordId": "not-an-id", "name": "X", "rank": "Officer", "tier": "Patrol Bureau"}], "positions": [{"ord": 1, "rank": "Officer", "appointment": "x", "tier": "Patrol Bureau"}]}$j$::jsonb, gen_random_uuid());
+  begin perform tpd.apply_roster_snapshot($j${"members": [{"discordId": "not-an-id", "name": "X", "rank": "Officer", "tier": "Patrol Bureau"}], "positions": [{"ord": 1, "rank": "Officer", "appointment": "x", "tier": "Patrol Bureau"}]}$j$::jsonb, gen_random_uuid());
     raise exception 'bad id applied'; exception when check_violation then null; end;
 end $$;
 reset role;
 do $$ begin
-  assert (select count(*) from public.personnel where status = 'active') = 2, 'failed apply preserved previous snapshot';
-  assert (select count(*) from public.positions) = 1, 'positions preserved';
+  assert (select count(*) from tpd.personnel where status = 'active') = 2, 'failed apply preserved previous snapshot';
+  assert (select count(*) from tpd.positions) = 1, 'positions preserved';
 end $$;
 
 -- 10. A former member signing in is told so and gets no member access.
@@ -135,9 +135,9 @@ insert into auth.identities (user_id, provider, provider_id) values ('00000000-0
 set role authenticated;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
 do $$ begin
-  assert (public.my_membership() ->> 'state') = 'former', 'former state';
-  assert not public.is_active_member(), 'former is not active';
-  assert (select count(*) from public.personnel_directory) = 0, 'former reads directory';
+  assert (tpd.my_membership() ->> 'state') = 'former', 'former state';
+  assert not tpd.is_active_member(), 'former is not active';
+  assert (select count(*) from tpd.personnel_directory) = 0, 'former reads directory';
 end $$;
 reset role;
 

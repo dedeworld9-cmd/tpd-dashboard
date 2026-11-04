@@ -20,6 +20,11 @@ Supabase
         integration-health  authenticated checks of all four integrations
 ```
 
+All TPD tables and functions live in the Postgres schema `tpd` (exposed through the Data API), because the
+Supabase project `ajequjidyrsitqmcqkwr` also hosts the District Five app in `public`. The two apps share
+Supabase Auth (one user list, one Discord provider). District Five's `on_auth_user_created` trigger therefore
+also runs for TPD sign-ins; TPD never reads District Five tables.
+
 The frontend stays on GitHub Pages. Every write happens in an Edge Function after a
 server-side check; signed-in users have no write grants on any table.
 

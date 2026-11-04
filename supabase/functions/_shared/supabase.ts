@@ -9,6 +9,9 @@
 
 import { fetchWithRetry } from "./http.ts";
 
+/** Postgres schema that holds every TPD table and function (shares the project with other apps). */
+export const DB_SCHEMA = "tpd";
+
 export interface Env {
   get(name: string): string | undefined;
 }
@@ -33,7 +36,14 @@ export function client(env: Env) {
     async (path: string, init: RequestInit = {}) => {
       const res = await fetchWithRetry(
         `${url}/rest/v1/${path}`,
-        { ...init, headers: { apikey: key, authorization: `Bearer ${bearer}`, "content-type": "application/json", ...(init.headers ?? {}) } },
+        { ...init, headers: {
+            apikey: key,
+            authorization: `Bearer ${bearer}`,
+            "content-type": "application/json",
+            "accept-profile": DB_SCHEMA,
+            "content-profile": DB_SCHEMA,
+            ...(init.headers ?? {}),
+          } },
         { attempts: 2 },
       );
       if (!res.ok) throw new HttpError(res.status === 401 || res.status === 403 ? 403 : 502, `database request failed (${res.status})`);
