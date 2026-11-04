@@ -82,3 +82,9 @@ The first sync must be done by someone who is already Captain+ on the roster. Th
 - E2E: `tests/e2e/integrations.spec.ts`. The default build checks the "not configured" states. A build with a fake `NEXT_PUBLIC_SUPABASE_URL=https://fakeproj.supabase.co` and `E2E_FAKE_BACKEND=1` checks Discord PKCE redirect parameters and every membership state against stubbed responses.
 
 None of these tests talks to the real Discord, Google, Supabase or AnchorCAD; those checks need the credentials above.
+
+## Live state (2026-11-04)
+- Project `ajequjidyrsitqmcqkwr`: `tpd` schema migrated and exposed; TPD callback in the redirect allow list; Discord provider shared with District Five.
+- Functions deployed from the dashboard editor as single-file bundles: `npx esbuild supabase/functions/<name>/index.ts --bundle --format=esm --platform=neutral`. roster-sync has gateway JWT verification off (it checks a command JWT or `x-sync-secret` itself); the other two keep it on.
+- Secrets set: `DISCORD_GUILD_ID`, `ALLOWED_ORIGINS`, `GOOGLE_SHEETS_ID`. Missing: `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS`, `ROSTER_SYNC_SECRET`, AnchorCAD.
+- The site build uses the project's publishable key (public by design). Not deployed yet.
