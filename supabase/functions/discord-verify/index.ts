@@ -19,6 +19,10 @@ const env = { get: (k: string) => Deno.env.get(k) };
 Deno.serve(
   handler(env, async (req) => {
     const db = client(env);
+    // Authenticate before anything else: the gateway's JWT check is off for this function (the project signs tokens with an
+    // asymmetric key the legacy check cannot verify), so this Auth round trip is the access control.
+    const jwt = bearer(req);
+    await db.user(jwt);
     const body = await req.json().catch(() => ({}));
     const guildId = env.get("DISCORD_GUILD_ID");
     if (!guildId) {
@@ -28,8 +32,6 @@ Deno.serve(
     const discordToken = typeof body.discordToken === "string" && body.discordToken.length < 512 ? body.discordToken : null;
     if (!discordToken) throw new HttpError(400, "A Discord sign-in token is required. Sign in with Discord again.");
 
-    const jwt = bearer(req);
-    await db.user(jwt);
     const asUser = db.asUser(jwt!);
     const expected: string | null = await asUser("rpc/current_discord_id", { method: "POST", body: "{}" });
     if (!expected || !SNOWFLAKE.test(expected)) throw new HttpError(403, "This account did not sign in with Discord");

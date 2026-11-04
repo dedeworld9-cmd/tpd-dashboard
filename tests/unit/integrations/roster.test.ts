@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RANKS as APP_RANKS } from "@/lib/authz";
 import { buildSnapshot, diffMembers, parseDivisions, parseRoster, positionShrinkGuard, RANKS, removalGuard, type CurrentMember, type Rows } from "../../../supabase/functions/_shared/roster.ts";
-import { runRosterSync, publicChanges, type SyncDeps } from "../../../supabase/functions/_shared/roster-sync.ts";
+import { runRosterSync, publicChanges, selectMode, type SyncDeps } from "../../../supabase/functions/_shared/roster-sync.ts";
 import { divisionRows, id, rosterRows } from "./fixtures";
 
 const build = (r: Rows = rosterRows(), d: Rows = divisionRows()) => buildSnapshot(parseRoster(r), parseDivisions(d));
@@ -186,6 +186,18 @@ describe("change detection", () => {
     expect(removalGuard(20, changes, false)?.code).toBe("mass_removal");
     expect(removalGuard(20, changes, true)).toBeNull();
     expect(removalGuard(20, changes.slice(0, 3), false)).toBeNull();
+  });
+});
+
+describe("sync mode", () => {
+  it("lets the first import be dry-run with the sync secret, and never applies by accident", () => {
+    expect(selectMode(true, "preview")).toBe("preview");
+    expect(selectMode(true, "apply")).toBe("apply");
+    expect(selectMode(true, undefined)).toBe("apply"); // the scheduler body is {"mode":"apply"}
+    expect(selectMode(false, undefined)).toBe("preview");
+    expect(selectMode(false, "preview")).toBe("preview");
+    expect(selectMode(false, "apply")).toBe("apply");
+    expect(selectMode(false, "anything else")).toBe("preview");
   });
 });
 

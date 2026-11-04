@@ -7,6 +7,16 @@
 import { buildSnapshot, canonical, diffMembers, parseDivisions, parseRoster, positionShrinkGuard, removalGuard, type Change, type CurrentMember, type Issue, type Rows, type Snapshot } from "./roster.ts";
 
 export type Mode = "preview" | "apply";
+/**
+ * Which mode a request runs in. A command user's call defaults to preview. The scheduler defaults to apply,
+ * but may ask for "preview", which is how the very first import is dry-run before anything is applied
+ * (no command user exists before the first import).
+ */
+export function selectMode(scheduled: boolean, requested: unknown): Mode {
+  if (scheduled) return requested === "preview" ? "preview" : "apply";
+  return requested === "apply" ? "apply" : "preview";
+}
+
 export type RunStatus = "applied" | "no_changes" | "preview" | "rejected" | "failed";
 
 export interface SyncDeps {

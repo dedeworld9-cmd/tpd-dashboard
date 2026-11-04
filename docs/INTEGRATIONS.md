@@ -73,7 +73,7 @@ server-side check; signed-in users have no write grants on any table.
 Use `.env.example` for the variable list. Secrets go only into `supabase secrets set`; never into `NEXT_PUBLIC_*`, the repository or chat.
 
 ## Bootstrap note
-The first sync must be done by someone who is already Captain+ on the roster. That is impossible before the first import, so the first import runs from the scheduler: set `ROSTER_SYNC_SECRET`, store the same value in Vault, run `supabase/sql/schedule-roster-sync.sql`, and the next 10-minute tick imports the roster (no custom HTTP header needed by hand). After that, command users manage it from the site.
+No command user exists before the first import, so the first import is driven by the sync secret from the SQL editor: a dry run (`{"mode":"preview"}`, writes nothing but a run record), then, once the report is acceptable, one manual apply, then the schedule. `ROSTER_SYNC_SECRET` is generated in Vault and copied from there to the function secret, so it never passes through chat or the repo. After the first import, command users run preview/apply from Command Center > Integrations.
 
 ## Member access (Phase 1)
 - **Gate.** With a backend configured, no HQ page renders until sign-in, roster verification (`my_membership()`, matched on the exact Discord user ID from `auth.identities`) and the real directory load all succeed. Any failure closes HQ; there is never a fallback to demo personas. Signed-out visitors, unrecognized, former, inactive and unverifiable accounts see only the sign-in screen with the reason.
@@ -83,8 +83,12 @@ The first sync must be done by someone who is already Captain+ on the roster. Th
 - **Expired sessions.** A 401 or JWT error from the roster call ends the session locally and returns to sign-in; it is never shown as an outage.
 - **Roster import guards** (all reject the run, leaving the last valid snapshot): header/rank/Discord-ID/call-sign format errors, duplicate Discord ID or call sign, no member with a valid ID, a mass removal, and a position count that drops below 80% of the last import. A command user can confirm the last two manually. Warnings (not blocking): name without Discord ID, duplicate names under different IDs, more than three division slots for one member (HB §9.3), division holders missing from the roster.
 
-### If the first sign-in shows "Invalid JWT"
-Both `discord-verify` and `integration-health` validate the bearer token against Supabase Auth themselves before doing anything. If the gateway's own JWT check rejects real member tokens (possible with asymmetric JWT signing keys), turn **Verify JWT** off for those two functions in the dashboard. That does not weaken access: the in-function check stays.
+### JWT verification
+The project signs user tokens with an asymmetric key (ECC P-256; Project Settings > JWT Keys, verified 2026-11-04). The dashboard switch "Verify JWT with legacy secret" only accepts the legacy HS256 secret, so with it ON every real member session is rejected with "Invalid JWT" before the function runs. It must be OFF for the three functions, and that is safe only because each one authenticates the caller itself:
+- `discord-verify`: the first thing it does is send the bearer token to Supabase Auth (`/auth/v1/user`: signature, expiry, revoked sessions). The anon/publishable key is not a user token and is refused.
+- `integration-health`: `requireCommand` does the same, then `is_command()` (roster rank) must be true.
+- `roster-sync`: a command user's token the same way, or the `x-sync-secret` header.
+`supabase/config.toml` records this. Do not disable legacy API keys (`SUPABASE_ANON_KEY` is what the functions use to call Auth) until the functions are moved to the new keys.
 
 ## Tests
 - `npm test`: parser, validation, change detection, sync failure paths, Google JWT signing, Discord (member-token) and AnchorCAD adapters (mocked HTTP), and secret hygiene.
@@ -96,12 +100,12 @@ None of these tests talks to the real Discord, Google, Supabase or AnchorCAD; th
 
 ## Live state (2026-11-04)
 - Project `ajequjidyrsitqmcqkwr`: `tpd` schema migrated and exposed; TPD callback in the redirect allow list; Discord provider shared with District Five.
-- Functions deployed from the dashboard editor as single-file bundles: `npx esbuild supabase/functions/<name>/index.ts --bundle --format=esm --platform=neutral`. roster-sync has gateway JWT verification off (it checks a command JWT or `x-sync-secret` itself); the other two keep it on.
+- Functions deployed from the dashboard editor as single-file bundles: `npx esbuild supabase/functions/<name>/index.ts --bundle --format=esm --platform=neutral`. Gateway JWT verification must be OFF for all three (see "JWT verification"); each checks the caller itself.
 - Secrets set: `DISCORD_GUILD_ID`, `ALLOWED_ORIGINS`, `GOOGLE_SHEETS_ID`. Missing: `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS`, `ROSTER_SYNC_SECRET`, AnchorCAD.
 - The site build uses the project's publishable key (public by design). Not deployed yet.
 
 ## Pending on the live project (Phase 1 changes, not applied)
 1. Apply `supabase/migrations/20261105000000_roster_apply_hardening.sql` (SQL editor). Without it the first sync can fail on an unqualified `DELETE` and `my_membership` lacks the member id the new directory needs.
-2. Redeploy `discord-verify` (fix: command users were matched against the first personnel row instead of their own) and `roster-sync` (truncation guard).
+2. Redeploy `discord-verify` (fix: command users were matched against the first personnel row instead of their own; authenticates before anything else) and `roster-sync` (truncation guard; dry run with the sync secret). Turn Verify JWT OFF for `discord-verify` and `integration-health`.
 3. Missing secrets: `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS`, `ROSTER_SYNC_SECRET`. Then the scheduler SQL.
 4. Rebuild and deploy the site (needs approval).

@@ -3,12 +3,12 @@
  *
  * Callers:
  *   - a command user (Captain+ on the roster), with their Supabase session token;
- *   - the scheduler, with header x-sync-secret = ROSTER_SYNC_SECRET (apply only).
+ *   - the scheduler / first-import caller, with header x-sync-secret = ROSTER_SYNC_SECRET (apply by default; "preview" is honored).
  * Reads the roster with a read-only Google service account. Never writes to Google.
  */
 
 import { accessToken, parseServiceAccount, readTabs, ROSTER_RANGES } from "../_shared/google.ts";
-import { publicChanges, runRosterSync } from "../_shared/roster-sync.ts";
+import { publicChanges, runRosterSync, selectMode } from "../_shared/roster-sync.ts";
 import type { CurrentMember } from "../_shared/roster.ts";
 import { audit, client, handler, HttpError, recordStatus, requireCommand, sha256 } from "../_shared/supabase.ts";
 
@@ -26,7 +26,7 @@ Deno.serve(
       const me = await db.asUser(jwt)("rpc/my_membership", { method: "POST", body: "{}" });
       actor = `roster:${me?.member?.callsign ?? "command"}`;
     }
-    const mode = scheduled ? "apply" : body.mode === "apply" ? "apply" : "preview";
+    const mode = selectMode(scheduled, body.mode);
 
     const sheetId = env.get("GOOGLE_SHEETS_ID");
     const sa = parseServiceAccount(env.get("GOOGLE_SERVICE_ACCOUNT_CREDENTIALS"));
