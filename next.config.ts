@@ -5,7 +5,7 @@ import type { NextConfig } from "next";
  * /tampaPD). The default build is unchanged for Vercel.
  */
 const pages = process.env.STATIC_EXPORT === "1";
-const basePath = pages ? "/tampaPD" : "";
+const basePath = pages ? (process.env.PAGES_BASE_PATH ?? "/tampaPD") : "";
 
 const nextConfig: NextConfig = pages
   ? {
