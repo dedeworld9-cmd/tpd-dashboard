@@ -29,7 +29,7 @@ const LABEL: Record<Status, [string, Tone]> = {
 };
 
 interface StatusRow {
-  integration: "discord_oauth" | "discord_bot" | "google_sheets" | "anchorcad";
+  integration: "discord_oauth" | "discord_guild" | "google_sheets" | "anchorcad";
   status: Status;
   detail: Record<string, unknown>;
   checked_at: string;
@@ -112,7 +112,7 @@ function Unconfigured() {
           status="not_configured"
           rows={[
             ["Sign-in (OAuth)", "Needs a Discord application and Supabase Auth"],
-            ["Bot", "Needs a bot token and guild ID"],
+            ["Server check", "Needs the TPD server ID (no bot)"],
             ["Role sync", "Read-only verification; role writes disabled"],
           ]}
         />
@@ -258,21 +258,17 @@ function Live() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Panel
           title="Discord"
-          status={st("discord_bot") === "connected" && st("discord_oauth") === "connected" ? "connected" : st("discord_oauth") === "connected" ? st("discord_bot") : st("discord_oauth")}
+          status={st("discord_oauth") === "connected" ? st("discord_guild") : st("discord_oauth")}
           rows={[
             ["Sign-in (OAuth)", LABEL[st("discord_oauth")][0]],
-            ["Bot", LABEL[st("discord_bot")][0]],
-            ["Guild", d("discord_bot", "guild")],
-            ["Role mapping", `${d("discord_bot", "confirmedRoles")} confirmed of ${d("discord_bot", "mappedRoles")}`],
+            ["Server check", `${LABEL[st("discord_guild")][0]} · member's own token, no bot`],
+            ["Members checked", `${d("discord_guild", "checkedMembers")} (${d("discord_guild", "inServer")} in the server)`],
+            ["Role mapping", `${d("discord_guild", "confirmedRoles")} confirmed of ${d("discord_guild", "mappedRoles")}`],
             ["Role writes", "Disabled"],
-            ["Last check", when(row("discord_bot")?.checked_at)],
-            ["Last error", row("discord_bot")?.last_error ?? row("discord_oauth")?.last_error ?? "None"],
+            ["Last check", when(row("discord_guild")?.checked_at)],
+            ["Last error", row("discord_guild")?.last_error ?? row("discord_oauth")?.last_error ?? "None"],
           ]}
-          action={
-            <Button size="sm" variant="secondary" loading={busy === "verify"} onClick={() => run("verify", async () => void (await auth.invoke("discord-verify", { all: true })))}>
-              Verify all members (read-only)
-            </Button>
-          }
+          footer={<p className="border-t border-line px-4 py-2 text-3xs text-muted">Each member is checked when they sign in. Without a bot the site cannot look up members who have not signed in.</p>}
         />
         <Panel
           title="Google Sheets"

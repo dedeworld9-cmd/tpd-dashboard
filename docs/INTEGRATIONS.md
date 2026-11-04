@@ -1,7 +1,7 @@
 # Integrations: Discord, Google Sheets roster, AnchorCAD
 
 Status as of 2026-11-04: **code complete and tested; not activated.** No Supabase project,
-Discord application, bot, Google service account or AnchorCAD key exists yet, so nothing
+Discord application, Google service account or AnchorCAD key exists yet, so nothing
 is connected. The site says so everywhere ("Not configured"); nothing claims to be live.
 
 ## Architecture
@@ -16,7 +16,7 @@ Supabase
    │    roster_sync_runs, audit_log, discord_role_map, discord_verifications, integration_status
    └─ Edge Functions (supabase/functions), secrets server-side only:
         roster-sync         Google Sheets → validate → preview / apply (atomic)
-        discord-verify      read-only guild membership + role comparison
+        discord-verify      member's own token → guild membership + role comparison (no bot)
         integration-health  authenticated checks of all four integrations
 ```
 
@@ -38,10 +38,13 @@ server-side check; signed-in users have no write grants on any table.
 - Direction is Sheets → website only. Nothing writes to Google.
 - Scheduled every 10 minutes once `supabase/sql/schedule-roster-sync.sql` is run; command users can preview and apply manually from Command Center → Integrations.
 
-### Discord bot
-- Read-only: `GET /users/@me`, `/guilds/{id}`, `/guilds/{id}/roles`, `/guilds/{id}/members/{user}`.
+### Discord server membership (no bot)
+- Sign-in asks Discord for `identify` and `guilds.members.read` only. Nothing can post, join servers or act for the member.
+- On the OAuth callback page the browser sends Discord's short-lived token once to `discord-verify`. The function checks that `GET /users/@me` returns the same ID as the Supabase identity, then reads `GET /users/@me/guilds/{DISCORD_GUILD_ID}/member` (role IDs). The token is not stored or logged by the server.
 - Roles are compared with the roster only through **confirmed** rows in `discord_role_map`. Findings and a dry-run plan are stored; `ROLE_WRITES_ENABLED = false`. Planned role removals are always manual.
-- An outage is reported as a failure. It is never recorded as "not in the server".
+- A 404 is "not in the server". A missing scope, an invalid token or an outage is reported as a failure and is never recorded as "not in the server".
+- Limit of this method: a member is only checked when they sign in, and role names cannot be listed (role IDs only; copy them in Discord with Developer Mode). A bulk "verify everyone" needs a bot, which dede declined.
+- Note: supabase-js keeps the session, including that provider token, in the member's own browser storage. Its scopes are read-only identity and membership.
 
 ### AnchorCAD
 - Official Open Developer API exists: `https://anchorcad.xyz/api/v1`, header `x-api-key`, keys `ank_v1.<serverId>.<secret>` bound to one panel, scopes, about 120 requests/min ([docs](https://docs.anchr.gg/api-reference/index)).
@@ -54,13 +57,13 @@ server-side check; signed-in users have no write grants on any table.
 |---|------|-------|
 | 1 | Create a Supabase project. Run `supabase link`, `supabase db push` (migrations), then `supabase functions deploy roster-sync discord-verify integration-health`. | supabase.com |
 | 2 | Create a Discord application. Add the redirect `https://<project-ref>.supabase.co/auth/v1/callback`. In Supabase Auth → Providers → Discord, paste the client ID and secret. In Auth → URL configuration, add `https://dedeworld9-cmd.github.io/tpd-dashboard/hq/auth/callback/` to the redirect allow list. | discord.com/developers, Supabase |
-| 3 | Add a bot to that application and invite it to the TPD server with **no permissions beyond View Channels** (read-only REST lookups). Set `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID` as function secrets. | Discord |
+| 3 | Set `DISCORD_GUILD_ID` (the TPD server ID) as a function secret. No bot is needed. | Supabase |
 | 4 | Create a Google Cloud service account with the Sheets API enabled. Share the roster sheet with its email as **Viewer**. Set `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS` (the JSON) and `GOOGLE_SHEETS_ID`. | Google Cloud |
 | 5 | Set `ROSTER_SYNC_SECRET` and `ALLOWED_ORIGINS=https://dedeworld9-cmd.github.io`. Then run `supabase/sql/schedule-roster-sync.sql`. | Supabase |
 | 6 | Optional: create an AnchorCAD API key with `server:read` only (Dashboard → Config → Developer API). Set `ANCHORCAD_API_KEY` and `ANCHORCAD_PANEL_URL`. | AnchorCAD |
 | 7 | Build the site with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_ANCHORCAD_URL`. All three are public by design. Deploying needs dede's approval. | build env |
 | 8 | First run: a Captain+ member signs in. Then open Command Center → Integrations, click **Run health checks**, then **Preview sync**, then **Apply**. | the site |
-| 9 | Role mapping: after the bot works, list the roles (Discord → Server Settings → Roles, or the health check). Insert rows in `discord_role_map`, and set `confirmed_by`/`confirmed_at` only after leadership confirms each mapping. | SQL editor |
+| 9 | Role mapping: copy role IDs in Discord (Developer Mode → Server Settings → Roles → Copy Role ID). Insert rows in `discord_role_map`, and set `confirmed_by`/`confirmed_at` only after leadership confirms each mapping. | SQL editor |
 
 Use `.env.example` for the variable list. Secrets go only into `supabase secrets set`; never into `NEXT_PUBLIC_*`, the repository or chat.
 
@@ -68,7 +71,7 @@ Use `.env.example` for the variable list. Secrets go only into `supabase secrets
 The first sync must be done by someone who is already Captain+ on the roster. That is impossible before the first import, so run the first sync once from the Supabase dashboard, by invoking `roster-sync` with the `x-sync-secret` header, or wait for the scheduler. After that, command users manage it from the site.
 
 ## Tests
-- `npm test`: parser, validation, change detection, sync failure paths, Google JWT signing, Discord and AnchorCAD adapters (mocked HTTP), and secret hygiene.
+- `npm test`: parser, validation, change detection, sync failure paths, Google JWT signing, Discord (member-token) and AnchorCAD adapters (mocked HTTP), and secret hygiene.
 - `supabase/tests/run-as-nonroot.sh` (or `run-local.sh` as a non-root user): applies the migration to a throwaway PostgreSQL with a stub auth schema and checks RLS, membership states and snapshot safety.
 - `deno check` on the three functions (`supabase/functions/deno.json`).
 - E2E: `tests/e2e/integrations.spec.ts`. The default build checks the "not configured" states. A build with a fake `NEXT_PUBLIC_SUPABASE_URL=https://fakeproj.supabase.co` and `E2E_FAKE_BACKEND=1` checks Discord PKCE redirect parameters and every membership state against stubbed responses.

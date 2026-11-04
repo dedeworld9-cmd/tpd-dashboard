@@ -112,7 +112,7 @@ create table public.discord_verifications (
 );
 
 create table public.integration_status (
-  integration text primary key check (integration in ('discord_oauth', 'discord_bot', 'google_sheets', 'anchorcad')),
+  integration text primary key check (integration in ('discord_oauth', 'discord_guild', 'google_sheets', 'anchorcad')),
   status text not null check (status in ('connected', 'not_configured', 'verification_required', 'degraded', 'failed', 'unsupported')),
   detail jsonb not null default '{}'::jsonb,
   checked_at timestamptz not null default now(),
@@ -304,7 +304,7 @@ create policy integration_status_command on public.integration_status for select
 revoke insert, update, delete, truncate on all tables in schema public from anon, authenticated;
 revoke all on all tables in schema public from anon;
 grant select on public.personnel_directory to authenticated;
-grant execute on function public.my_membership(), public.is_command(), public.is_active_member() to authenticated;
+grant execute on function public.my_membership(), public.is_command(), public.is_active_member(), public.current_discord_id() to authenticated;
 
 -- Number of completed Discord sign-ins (for the integration panel). Service role only.
 create or replace function public.discord_identity_count() returns int

@@ -1,5 +1,11 @@
 /**
- * Read-only Discord bot checks (official REST API v10, bot token from a server secret).
+ * Read-only Discord checks with the member's own OAuth token (no bot).
+ *
+ * At sign-in the member grants `identify` and `guilds.members.read`. Right after
+ * the OAuth callback the browser sends that short-lived provider token once to
+ * discord-verify, which calls the two documented user endpoints below
+ * (official REST API v10). The token is used for this request only: it is never
+ * stored or logged by the server.
  *
  * Roles never grant website access. The roster decides identity and rank;
  * roles are only compared against it and mismatches are reported for review.
@@ -11,45 +17,34 @@ import { fetchWithRetry, UpstreamError, type RetryOptions } from "./http.ts";
 const API = "https://discord.com/api/v10";
 export const ROLE_WRITES_ENABLED = false as const;
 export const SNOWFLAKE = /^\d{17,20}$/;
+export const USER_SCOPES = "identify guilds.members.read" as const;
 
-const headers = (token: string) => ({ authorization: `Bot ${token}`, "user-agent": "TPD-HQ (https://github.com/dedeworld9-cmd/tpd-dashboard, 1.0)" });
+const headers = (token: string) => ({ authorization: `Bearer ${token}`, "user-agent": "TPD-HQ (https://github.com/dedeworld9-cmd/tpd-dashboard, 1.0)" });
 
-async function get(path: string, token: string, opts: RetryOptions) {
-  const res = await fetchWithRetry(`${API}${path}`, { headers: headers(token) }, opts);
-  return res;
-}
-
-export async function botIdentity(token: string, opts: RetryOptions = {}): Promise<{ id: string; username: string }> {
-  const res = await get("/users/@me", token, opts);
-  if (res.status === 401) throw new UpstreamError("Discord rejected the bot token", 401, false);
+/** GET /users/@me with the member's token: proves whose token it is. */
+export async function tokenOwner(token: string, opts: RetryOptions = {}): Promise<{ id: string; username: string }> {
+  const res = await fetchWithRetry(`${API}/users/@me`, { headers: headers(token) }, opts);
+  if (res.status === 401) throw new UpstreamError("Discord rejected the sign-in token. Sign in again.", 401, false);
   if (!res.ok) throw new UpstreamError(`Discord answered ${res.status}`, res.status, false);
   const b = await res.json();
+  if (!SNOWFLAKE.test(String(b.id))) throw new UpstreamError("Discord returned an invalid user ID", res.status, false);
   return { id: String(b.id), username: String(b.username) };
 }
 
-export async function guildInfo(guildId: string, token: string, opts: RetryOptions = {}): Promise<{ id: string; name: string }> {
+/**
+ * GET /users/@me/guilds/{guild}/member (scope guilds.members.read).
+ * Returns the member's role IDs, or null when Discord says they are not in the server (404).
+ * A missing scope (403), a bad token (401) or an outage throws: none of those is "not in the server".
+ */
+export async function ownGuildMember(guildId: string, token: string, opts: RetryOptions = {}): Promise<{ roles: string[]; nick: string | null } | null> {
   if (!SNOWFLAKE.test(guildId)) throw new UpstreamError("DISCORD_GUILD_ID is not a valid ID", null, false);
-  const res = await get(`/guilds/${guildId}`, token, opts);
-  if (res.status === 403 || res.status === 404) throw new UpstreamError("The bot is not in the configured guild, or the guild ID is wrong", res.status, false);
-  if (!res.ok) throw new UpstreamError(`Discord answered ${res.status}`, res.status, false);
-  const b = await res.json();
-  return { id: String(b.id), name: String(b.name) };
-}
-
-export async function guildRoles(guildId: string, token: string, opts: RetryOptions = {}): Promise<{ id: string; name: string; position: number; managed: boolean }[]> {
-  const res = await get(`/guilds/${guildId}/roles`, token, opts);
-  if (!res.ok) throw new UpstreamError(`Discord answered ${res.status} for guild roles`, res.status, false);
-  return (await res.json()).map((r: { id: string; name: string; position: number; managed: boolean }) => ({ id: String(r.id), name: r.name, position: r.position, managed: !!r.managed }));
-}
-
-/** A member's role IDs, or null when the user is not in the guild. */
-export async function memberRoles(guildId: string, userId: string, token: string, opts: RetryOptions = {}): Promise<string[] | null> {
-  if (!SNOWFLAKE.test(userId)) throw new UpstreamError("invalid user ID", null, false);
-  const res = await get(`/guilds/${guildId}/members/${userId}`, token, opts);
+  const res = await fetchWithRetry(`${API}/users/@me/guilds/${guildId}/member`, { headers: headers(token) }, opts);
   if (res.status === 404) return null;
-  if (!res.ok) throw new UpstreamError(`Discord answered ${res.status} for a member lookup`, res.status, res.status === 429 || res.status >= 500);
+  if (res.status === 401) throw new UpstreamError("Discord rejected the sign-in token. Sign in again.", 401, false);
+  if (res.status === 403) throw new UpstreamError("Discord did not grant server-membership access (guilds.members.read). Sign in again and allow it.", 403, false);
+  if (!res.ok) throw new UpstreamError(`Discord answered ${res.status} for the membership check`, res.status, res.status === 429 || res.status >= 500);
   const b = await res.json();
-  return Array.isArray(b.roles) ? b.roles.map(String) : [];
+  return { roles: Array.isArray(b.roles) ? b.roles.map(String) : [], nick: typeof b.nick === "string" ? b.nick : null };
 }
 
 export interface RoleMapping {

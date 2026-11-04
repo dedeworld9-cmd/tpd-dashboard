@@ -1,14 +1,18 @@
 /**
- * POST /functions/v1/discord-verify   body: { "all"?: boolean }
+ * POST /functions/v1/discord-verify   body: { "discordToken": string }
  *
- * Read-only check of Discord server membership and roles against the roster.
- *   - any verified member: checks themself;
- *   - command (Captain+ on the roster) with all=true: checks every active member.
- * Findings are stored for review. Nothing here changes access or Discord roles.
+ * No bot. Called once by the browser right after Discord sign-in, with the
+ * member's own short-lived Discord token (scopes identify + guilds.members.read).
+ *   1. The Supabase session is validated, and its Discord identity is read from auth.identities.
+ *   2. GET /users/@me must return that same Discord ID, so a token for another account is refused.
+ *   3. GET /users/@me/guilds/{DISCORD_GUILD_ID}/member gives server membership and role IDs.
+ * The result is compared with the roster and stored for review. The token is not stored or logged.
+ * Nothing here changes website access or Discord roles.
  */
 
-import { evaluateRoles, guildInfo, memberRoles, planRoleSync, type RoleMapping } from "../_shared/discord.ts";
-import { audit, bearer, client, handler, HttpError, recordStatus, requireCommand } from "../_shared/supabase.ts";
+import { evaluateRoles, ownGuildMember, planRoleSync, tokenOwner, type RoleMapping } from "../_shared/discord.ts";
+import { UpstreamError } from "../_shared/http.ts";
+import { bearer, client, handler, HttpError, recordStatus } from "../_shared/supabase.ts";
 
 const env = { get: (k: string) => Deno.env.get(k) };
 
@@ -16,51 +20,49 @@ Deno.serve(
   handler(env, async (req) => {
     const db = client(env);
     const body = await req.json().catch(() => ({}));
-    const token = env.get("DISCORD_BOT_TOKEN");
     const guildId = env.get("DISCORD_GUILD_ID");
-    if (!token || !guildId) {
-      await recordStatus(db, "discord_bot", "not_configured", { tokenConfigured: !!token, guildConfigured: !!guildId });
-      throw new HttpError(503, "The Discord bot is not configured (DISCORD_BOT_TOKEN and DISCORD_GUILD_ID).");
+    if (!guildId) {
+      await recordStatus(db, "discord_guild", "not_configured", { guildConfigured: false });
+      throw new HttpError(503, "The Discord server check is not configured (DISCORD_GUILD_ID).");
+    }
+    const discordToken = typeof body.discordToken === "string" && body.discordToken.length < 512 ? body.discordToken : null;
+    if (!discordToken) throw new HttpError(400, "A Discord sign-in token is required. Sign in with Discord again.");
+
+    const jwt = bearer(req);
+    await db.user(jwt);
+    const asUser = db.asUser(jwt!);
+    const expected: string | null = await asUser("rpc/current_discord_id", { method: "POST", body: "{}" });
+    if (!expected) throw new HttpError(403, "This account did not sign in with Discord");
+
+    let roles: string[] | null;
+    try {
+      const owner = await tokenOwner(discordToken);
+      if (owner.id !== expected) throw new HttpError(403, "The Discord token belongs to a different account");
+      roles = (await ownGuildMember(guildId, discordToken))?.roles ?? null;
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      const msg = e instanceof UpstreamError ? e.message : "Discord could not be reached";
+      await recordStatus(db, "discord_guild", "failed", { guild: "configured" }, msg);
+      throw new HttpError(502, msg); // an outage is never recorded as "not in the server"
     }
 
     const svc = db.service();
-    let targets: { id: string; discord_id: string; rank: string }[];
-    if (body.all === true) {
-      await requireCommand(db, req);
-      targets = await svc("personnel?select=id,discord_id,rank&status=eq.active");
-    } else {
-      const jwt = bearer(req);
-      await db.user(jwt);
-      const me = await db.asUser(jwt!)("personnel?select=id,discord_id,rank,status");
-      if (!me.length || me[0].status !== "active") throw new HttpError(403, "Only verified members can be checked");
-      targets = me;
-    }
-
-    try {
-      await guildInfo(guildId, token);
-    } catch (e) {
-      await recordStatus(db, "discord_bot", "failed", {}, (e as Error).message);
-      throw new HttpError(502, (e as Error).message);
-    }
-
+    const me: { id: string; rank: string; status: string }[] = await asUser("personnel?select=id,rank,status");
     const map: RoleMapping[] = await svc("discord_role_map?select=role_id,role_name,maps_to_kind,maps_to_value,confirmed_at");
-    const slots: { personnel_id: string; division_slug: string }[] = await svc("division_slots?select=personnel_id,division_slug&personnel_id=not.is.null");
-    const results = [];
-    for (const t of targets) {
-      const roles = await memberRoles(guildId, t.discord_id, token); // throws on outage: nothing is recorded as "not in guild"
-      const facts = { rank: t.rank, divisions: slots.filter((s) => s.personnel_id === t.id).map((s) => s.division_slug) };
-      const findings = evaluateRoles(facts, roles, map);
-      const plan = planRoleSync(findings, map, facts);
-      await svc("discord_verifications?on_conflict=personnel_id", {
-        method: "POST",
-        headers: { prefer: "resolution=merge-duplicates" },
-        body: JSON.stringify({ personnel_id: t.id, checked_at: new Date().toISOString(), in_guild: roles !== null, role_ids: roles ?? [], findings: { findings, dryRun: plan } }),
-      });
-      results.push({ personnelId: t.id, inGuild: roles !== null, findings, dryRun: plan });
-    }
     const confirmed = map.filter((m) => m.confirmed_at).length;
-    await recordStatus(db, "discord_bot", confirmed ? "connected" : "verification_required", { checked: results.length, mappedRoles: map.length, confirmedRoles: confirmed, roleWrites: "disabled" });
-    if (body.all === true) await audit(db, "command", "discord.verify.all", null, { checked: results.length });
-    return { body: { checked: results.length, results } };
+    await recordStatus(db, "discord_guild", confirmed ? "connected" : "verification_required", { guild: "configured", mappedRoles: map.length, confirmedRoles: confirmed, roleWrites: "disabled", method: "member token" });
+
+    if (!me.length) return { body: { inGuild: roles !== null, onRoster: false } };
+    const t = me[0];
+    const slots: { division_slug: string }[] = await svc(`division_slots?select=division_slug&personnel_id=eq.${t.id}`);
+    const facts = { rank: t.rank, divisions: slots.map((s) => s.division_slug) };
+    const findings = evaluateRoles(facts, roles, map);
+    const plan = planRoleSync(findings, map, facts);
+    await svc("discord_verifications?on_conflict=personnel_id", {
+      method: "POST",
+      headers: { prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({ personnel_id: t.id, checked_at: new Date().toISOString(), in_guild: roles !== null, role_ids: roles ?? [], findings: { findings, dryRun: plan } }),
+    });
+    return { body: { inGuild: roles !== null, onRoster: true, findings, dryRun: plan } };
   }),
 );

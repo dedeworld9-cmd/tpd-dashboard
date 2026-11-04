@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkApi, checkPanelUrl, CAPABILITIES } from "../../../supabase/functions/_shared/anchorcad.ts";
-import { evaluateRoles, memberRoles, planRoleSync, ROLE_WRITES_ENABLED, botIdentity, type RoleMapping } from "../../../supabase/functions/_shared/discord.ts";
+import { evaluateRoles, ownGuildMember, planRoleSync, ROLE_WRITES_ENABLED, tokenOwner, USER_SCOPES, type RoleMapping } from "../../../supabase/functions/_shared/discord.ts";
 import { accessToken, parseServiceAccount, readTabs, signAssertion, SHEETS_SCOPE } from "../../../supabase/functions/_shared/google.ts";
 import { fetchWithRetry, UpstreamError } from "../../../supabase/functions/_shared/http.ts";
 
@@ -101,19 +101,33 @@ describe("Discord bot (read-only)", () => {
     expect(evaluateRoles({ rank: "Officer", divisions: ["swat"] }, ["800000000000000001", "800000000000000002"], map)).toEqual([]);
   });
 
-  it("distinguishes 'not in the server' from an outage", async () => {
-    expect(await memberRoles("700000000000000001", "100000000000000001", "t", { fetchImpl: fakeFetch([json({}, 404)]).f, ...noSleep })).toBeNull();
+  it("distinguishes 'not in the server' from an outage or a missing scope", async () => {
+    const g = "700000000000000001";
+    expect(await ownGuildMember(g, "t", { fetchImpl: fakeFetch([json({ message: "Unknown Guild", code: 10004 }, 404)]).f, ...noSleep })).toBeNull();
     expect(evaluateRoles({ rank: "Officer", divisions: [] }, null, map)[0].code).toBe("not_in_guild");
-    await expect(memberRoles("700000000000000001", "100000000000000001", "t", { fetchImpl: fakeFetch([json({}, 500), json({}, 500), json({}, 500)]).f, ...noSleep })).rejects.toBeInstanceOf(
-      UpstreamError,
-    );
+    await expect(ownGuildMember(g, "t", { fetchImpl: fakeFetch([json({}, 500), json({}, 500), json({}, 500)]).f, ...noSleep })).rejects.toBeInstanceOf(UpstreamError);
+    await expect(ownGuildMember(g, "t", { fetchImpl: fakeFetch([json({}, 403)]).f, ...noSleep })).rejects.toThrow(/guilds.members.read/);
+    await expect(ownGuildMember(g, "t", { fetchImpl: fakeFetch([json({}, 401)]).f, ...noSleep })).rejects.toThrow(/Sign in again/);
+    await expect(ownGuildMember("not-an-id", "t", { fetchImpl: fakeFetch([]).f, ...noSleep })).rejects.toThrow(/not a valid ID/);
   });
 
-  it("sends the bot token only to discord.com and flags an invalid token", async () => {
-    const { f, calls } = fakeFetch([json({}, 401)]);
-    await expect(botIdentity("bad", { fetchImpl: f, ...noSleep })).rejects.toThrow(/rejected the bot token/);
-    expect(new URL(calls[0].url).host).toBe("discord.com");
-    expect((calls[0].init?.headers as Record<string, string>).authorization).toBe("Bot bad");
+  it("reads the member's own roles with their bearer token on discord.com only", async () => {
+    const { f, calls } = fakeFetch([json({ roles: ["800000000000000001"], nick: null })]);
+    expect(await ownGuildMember("700000000000000001", "usertok", { fetchImpl: f, ...noSleep })).toEqual({ roles: ["800000000000000001"], nick: null });
+    const u = new URL(calls[0].url);
+    expect(u.host).toBe("discord.com");
+    expect(u.pathname).toBe("/api/v10/users/@me/guilds/700000000000000001/member");
+    expect((calls[0].init?.headers as Record<string, string>).authorization).toBe("Bearer usertok");
+  });
+
+  it("identifies the token owner and rejects a bad token", async () => {
+    expect(await tokenOwner("t", { fetchImpl: fakeFetch([json({ id: "100000000000000001", username: "x" })]).f, ...noSleep })).toEqual({ id: "100000000000000001", username: "x" });
+    await expect(tokenOwner("bad", { fetchImpl: fakeFetch([json({}, 401)]).f, ...noSleep })).rejects.toThrow(/rejected the sign-in token/);
+    await expect(tokenOwner("t", { fetchImpl: fakeFetch([json({ id: "nope" })]).f, ...noSleep })).rejects.toThrow(/invalid user ID/);
+  });
+
+  it("requests only read scopes", () => {
+    expect(USER_SCOPES.split(" ").sort()).toEqual(["guilds.members.read", "identify"]);
   });
 });
 

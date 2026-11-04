@@ -25,7 +25,7 @@ export function SignInScreen() {
         <Badge size={56} className="mx-auto" />
         <h1 className="display mt-5 text-center text-xl font-bold">Sign in to Headquarters</h1>
         <p className="mt-2 text-center text-xs text-muted">
-          Sign in with the Discord account listed on the official TPD roster. The site reads your Discord user ID and username only; it cannot post or act on your behalf.
+          Sign in with the Discord account listed on the official TPD roster. The site reads your Discord user ID, username and your own TPD server membership (read-only); it cannot post, join servers or act on your behalf.
         </p>
 
         {auth.status === "disabled" ? (

@@ -96,7 +96,7 @@ Implemented and tested without credentials
 - Website: Discord sign-in through Supabase Auth with PKCE, callback page, membership states, verified identity card on the dashboard, sign-in and sign-out in the account menu, Command Center → Integrations (health, sync preview and apply, read-only member verification), and AnchorCAD launch-URL validation.
 
 Blocked on credentials (nothing is connected)
-- Supabase project; Discord application and bot plus guild ID; Google service account with Viewer access; AnchorCAD panel URL and an optional API key.
+- Supabase project; Discord application plus guild ID (no bot); Google service account with Viewer access; AnchorCAD panel URL and an optional API key.
 - Discord role mapping: the server's roles have not been seen, so no mapping exists, and none is enforced until leadership confirms it.
 - AnchorCAD member matching, report references and duty sync are unsupported, because the API response fields are undocumented.
 

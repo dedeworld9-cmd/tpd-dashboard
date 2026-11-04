@@ -1,10 +1,11 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "./client";
 import { authCallbackUrl, backendConfigured } from "./config";
 import { parseMembership, type Membership } from "./membership";
+import { USER_SCOPES } from "../../../supabase/functions/_shared/discord.ts";
 
 type Status = "disabled" | "loading" | "ready";
 
@@ -14,12 +15,19 @@ interface AuthApi {
   session: Session | null;
   membership: Membership | null;
   error: string | null;
+  /** Result of the Discord server check made with the member's own token at sign-in. */
+  serverCheck: ServerCheck | null;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   refresh(): Promise<void>;
   /** Calls an Edge Function with the current session token. */
   invoke<T = unknown>(fn: string, body?: Record<string, unknown>): Promise<T>;
 }
+
+export type ServerCheck = { state: "checking" } | { state: "done"; inGuild: boolean; onRoster: boolean } | { state: "failed"; message: string };
+
+/** Scopes requested from Discord: identity plus read-only access to the member's own server membership. */
+export const DISCORD_SCOPES = USER_SCOPES;
 
 const Ctx = createContext<AuthApi | null>(null);
 
@@ -28,6 +36,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [serverCheck, setServerCheck] = useState<ServerCheck | null>(null);
+  const sentToken = useRef<string | null>(null);
+
+  // Right after the OAuth callback the session carries Discord's short-lived token.
+  // It is sent once to discord-verify, which checks TPD server membership server-side.
+  const verifyServer = useCallback(async (s: Session) => {
+    const sb = supabase();
+    const token = s.provider_token;
+    // Only on the OAuth callback page: later page loads reuse a stored, possibly expired token.
+    if (!sb || !token || sentToken.current === token || !window.location.pathname.includes("/hq/auth/callback")) return;
+    sentToken.current = token;
+    setServerCheck({ state: "checking" });
+    const { data, error: e } = await sb.functions.invoke("discord-verify", { body: { discordToken: token } });
+    if (e) {
+      let message = "The Discord server check could not be completed.";
+      try {
+        const ctx = (e as { context?: Response }).context;
+        if (ctx) message = (await ctx.json()).error ?? message;
+      } catch {
+        /* keep the generic message */
+      }
+      setServerCheck({ state: "failed", message });
+    } else setServerCheck({ state: "done", inGuild: !!data?.inGuild, onRoster: !!data?.onRoster });
+  }, []);
 
   const load = useCallback(async (s: Session | null) => {
     const sb = supabase();
@@ -54,19 +86,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) return;
     let alive = true;
     sb.auth.getSession().then(({ data }) => {
-      if (alive) load(data.session);
+      if (!alive) return;
+      load(data.session);
+      if (data.session) void verifyServer(data.session);
     });
     const { data: sub } = sb.auth.onAuthStateChange((event, s) => {
       if (!alive) return;
       // A failed refresh ends the session; membership is re-read on every sign-in.
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") load(s);
+      if (event === "SIGNED_IN" && s) void verifyServer(s);
       else setSession(s);
     });
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
     };
-  }, [load]);
+  }, [load, verifyServer]);
 
   const api = useMemo<AuthApi>(
     () => ({
@@ -74,15 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       membership,
       error,
+      serverCheck,
       async signIn() {
         const sb = supabase();
         if (!sb) return;
-        const { error: e } = await sb.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: authCallbackUrl(window.location.origin) } });
+        const { error: e } = await sb.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: authCallbackUrl(window.location.origin), scopes: DISCORD_SCOPES } });
         if (e) setError("Discord sign-in could not start. Try again.");
       },
       async signOut() {
         await supabase()?.auth.signOut();
         setSession(null);
+        setServerCheck(null);
+        sentToken.current = null;
         setMembership({ state: "signed_out" });
       },
       async refresh() {
@@ -106,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return data as T;
       },
     }),
-    [status, session, membership, error, load],
+    [status, session, membership, error, serverCheck, load],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SECRET_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "DISCORD_CLIENT_SECRET", "DISCORD_BOT_TOKEN", "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS", "ANCHORCAD_API_KEY", "ROSTER_SYNC_SECRET"];
+const SECRET_NAMES = ["SUPABASE_SERVICE_ROLE_KEY", "DISCORD_CLIENT_SECRET", "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS", "ANCHORCAD_API_KEY", "ROSTER_SYNC_SECRET"];
 
 function files(dir: string, out: string[] = []) {
   for (const f of readdirSync(dir)) {
