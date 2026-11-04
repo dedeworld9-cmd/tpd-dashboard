@@ -192,3 +192,35 @@ in a numeric form or for email unless leadership needs them.
 The tampaPD GitHub repository is **public**. Roster data (Discord IDs, Roblox usernames,
 hire dates) must not be committed. The app will import roster data into the database at
 runtime only; seed files will use fictional placeholder members.
+
+## H. Department information integration (checked 2026-11-04)
+
+All sources re-read on 2026-11-04: RS (all six tabs), HB and UoF (both last modified
+2026-10-31, unchanged since discovery), GF (still the recruitment application).
+Earlier items PC-02, PC-03, PC-04, PC-05, PC-07, PC-09, PC-11 and PC-13 were re-checked and
+still stand. Restricted tabs (Hire Logs, Records) were read only to verify counts: Hire Logs
+lists the same 13 active members as TPD Roster; Records has no entries.
+
+### PC-26 · Field Training Division Commander's tier — Low
+- **Source A:** RS TPD Roster (2026-11-04) lists X-319 Captain "Field Training Division Commander" under ★★ Field Supervisory.
+- **Source B:** RS Numbers by Rank (2026-11-04) has Command Staff Captains = 3 total, which only adds up if X-319 is counted there (X-204, X-205, X-319).
+- **Recommended resolution:** Show X-319 under Field Supervisory, as the roster does; totals are unaffected.
+- **Leadership confirmation needed:** Yes (low priority), together with PC-06.
+
+### PC-27 · Seniority of Deputy Chief vs Assistant Chief — Low
+- **Source A:** RS TPD Roster and TPD | Vehicles list Chief of Police, Deputy Chief, then Assistant Chief.
+- **Source B:** RS Numbers by Rank lists Chief of Police, Assistant Chief(s), then Deputy Chief.
+- **Recommended resolution:** Keep Deputy Chief senior to Assistant Chief (two sources out of three, and the call-sign order X-102 before X-103/X-104).
+- **Leadership confirmation needed:** Yes, because "X and above" checks depend on it.
+
+### PC-28 · Department rank vs division position for the same member — Low
+- **Source A:** RS TPD Roster: X-412 is a Corporal (Patrol Aide).
+- **Source B:** RS TPD | Divisions: the same member holds W-12, a division "Officer" slot.
+- **Recommended resolution:** Treat division slots as division roles, separate from department rank (as PC-09 already proposes). The site shows the division role on division pages and the department rank everywhere else.
+- **Leadership confirmation needed:** No, unless division slots are meant to match rank.
+
+### PC-29 · Publishing member names on a public site — Decision for dede
+- **Source A:** CLAUDE.md and PC-25: keep roster data out of the public repository.
+- **Source B:** The integration directive (2026-11-04) asks for leadership and division command to be named; the roster sheet itself is publicly readable.
+- **Current state:** Only roleplay names as written on the roster ("J. Quinellope"), call signs, ranks and appointments are stored. Discord IDs, Roblox usernames, timezones, hire dates and disciplinary points are never stored (enforced by a unit test that fails on any Discord-ID-shaped number in `src`).
+- **Leadership confirmation needed:** dede chooses whether names are shown (asked 2026-11-04).

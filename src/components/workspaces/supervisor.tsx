@@ -46,7 +46,7 @@ export function SupervisorWorkspace() {
   return (
     <Page wide>
       <PageHeader eyebrow="Management" title="Supervisor desk" description="Who is on patrol, who needs a check-in, and what is waiting on your decision." />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex flex-col gap-5">
           <DistrictBoard state={state} now={now} district={district} />
           <Card>

@@ -83,9 +83,9 @@ export function Topbar() {
         </ol>
       </nav>
 
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-amber-soft px-2.5 py-0.5 text-3xs font-semibold text-amber ring-1 ring-inset ring-amber/20 xl:inline-flex" title="Fictional sample data. Nothing is saved to the department.">
+      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-amber-soft px-2.5 py-0.5 text-3xs font-semibold text-amber ring-1 ring-inset ring-amber/20 xl:inline-flex" title="Structure, divisions, fleet and policy are official. People, patrol sessions and requests are fictional demo data; nothing is saved to the department.">
         <FlaskConical aria-hidden className="size-3" />
-        Design preview · sample data
+        Design preview · demo personas
       </span>
 
       <div className="ml-auto flex items-center gap-1.5">

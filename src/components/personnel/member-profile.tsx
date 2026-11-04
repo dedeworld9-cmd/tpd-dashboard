@@ -110,7 +110,7 @@ export function ProfileBody({ member, state, now, full }: { member: Member; stat
       <Section title="Authorized vehicles">
         <ul className="flex flex-col gap-1.5">
           {VEHICLES.map((v) => {
-            const ok = vehicleAuthorized(member.rank, v.minRank);
+            const ok = vehicleAuthorized(member.rank, v);
             return (
               <li key={v.name} className={cn("flex items-center justify-between text-xs", !ok && "text-muted")}>
                 <span>{v.name}</span>

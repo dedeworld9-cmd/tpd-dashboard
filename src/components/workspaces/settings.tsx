@@ -58,7 +58,7 @@ export function SettingsWorkspace() {
 
         <Card>
           <CardHeader title="Design preview" description="These controls exist only while the portal runs on sample data" />
-          <div className="grid gap-2 border-t border-line p-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 border-t border-line p-4 sm:grid-cols-2">
             {(Object.keys(ROLE_PERSONA) as PreviewRole[]).map((r) => (
               <button key={r} type="button" aria-pressed={me.role === r} onClick={() => setRole(r)} className={cn("rounded-lg p-3 text-left ring-1 ring-inset", me.role === r ? "bg-gold-soft ring-gold" : "ring-line hover:bg-surface-2")}>
                 <span className="block text-xs font-semibold">Preview as {ROLE_PERSONA[r].label}</span>

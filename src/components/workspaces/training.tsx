@@ -33,12 +33,12 @@ export function TrainingWorkspace() {
       <PageHeader
         eyebrow="Personal"
         title={trainee ? "Your field training" : "Field training program"}
-        description="Every new officer completes six modules and patrols with a Police Training Officer before the Office of the Chiefs approves independent patrol (Handbook §3.1)."
-        meta={<Pill tone="amber">Module progress is sample data</Pill>}
+        description="Every new officer is appointed a Probationary Patrol Officer and completes six requirements, including the PTO Mentorship Program, before the Office of the Chiefs approves independent patrol (Handbook §3.1)."
+        meta={<Pill tone="amber">{trainee ? "Progress shown is sample data" : "No sign-offs are recorded yet"}</Pill>}
       />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
-          <CardHeader title={trainee ? "Your pathway" : "The six modules"} description={trainee ? `${done} of ${TRAINING_MODULES.length} signed off` : "Required for every Probationary Officer"} />
+          <CardHeader title={trainee ? "Your pathway" : "The pathway"} description={trainee ? `${done} of ${TRAINING_MODULES.length} steps complete (sample)` : "Seven steps for every Probationary Officer (Handbook §3.1)"} />
           <ol className="border-t border-line px-5 py-2">
             {TRAINING_MODULES.map((m, i) => {
               const state = trainee ? m.state : "Not started";
@@ -65,11 +65,6 @@ export function TrainingWorkspace() {
                       {trainee ? <Pill tone={state === "Complete" ? "green" : state === "In progress" ? "gold" : "neutral"}>{state}</Pill> : null}
                     </div>
                     <p className="mt-1 text-xs text-muted">{m.detail}</p>
-                    {trainee && m.signedBy ? (
-                      <p className="mt-1.5 text-3xs text-muted">
-                        Signed off by {m.signedBy} on {m.date}
-                      </p>
-                    ) : null}
                   </div>
                 </li>
               );

@@ -6,6 +6,7 @@ import {
   Gauge,
   GraduationCap,
   LayoutDashboard,
+  Network,
   Radio,
   Settings,
   ShieldCheck,
@@ -13,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Capability } from "@/lib/authz";
-import { DIVISIONS } from "@/lib/sample-data";
+import { DIVISIONS } from "@/lib/department";
 
 export interface NavLeaf {
   href: string;
@@ -42,6 +43,7 @@ export const NAV: NavGroup[] = [
   {
     label: "Department",
     items: [
+      { href: "/hq/structure", label: "Structure", icon: Network, shortcut: "G S" },
       { href: "/hq/roster", label: "Personnel", icon: Users, capability: "roster.view", shortcut: "G M" },
       {
         href: "/hq/divisions",
@@ -75,7 +77,7 @@ export const PAGES: { href: string; label: string; parent?: string; capability?:
   ...FOOTER_NAV.map((i) => ({ href: i.href, label: i.label })),
 ];
 
-export const GO_TO: Record<string, string> = { o: "/hq", p: "/hq/patrol", a: "/hq/activity", t: "/hq/training", m: "/hq/roster", r: "/hq/requests", c: "/hq/command" };
+export const GO_TO: Record<string, string> = { o: "/hq", p: "/hq/patrol", a: "/hq/activity", t: "/hq/training", m: "/hq/roster", s: "/hq/structure", r: "/hq/requests", c: "/hq/command" };
 
 /** AnchorCAD is the department's official reporting system (HB §10). No API integration exists. */
 export const ANCHORCAD_URL = process.env.NEXT_PUBLIC_ANCHORCAD_URL ?? "";

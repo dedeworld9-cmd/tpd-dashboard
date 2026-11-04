@@ -23,7 +23,8 @@ import { departmentMetrics, openRequests, roster } from "@/lib/preview/derived";
 import { useMe, useNow } from "@/lib/preview/hooks";
 import { allMembers, memberById, usePreviewState, type PreviewState, type RequestRecord } from "@/lib/preview/store";
 import { stateTone } from "@/lib/request-tone";
-import { DIVISIONS, type RequestState } from "@/lib/sample-data";
+import { DIVISIONS, divisionStaffing } from "@/lib/department";
+import type { RequestState } from "@/lib/sample-data";
 
 const TYPES: RequestType[] = ["Leave of absence", "LOA extension", "Activity correction", "Division application", "Ride-along", "Transfer", "Training enrollment"];
 const SWORN_SLOTS = 134; // Roster sheet: 134 sworn slots (docs/DATA_SOURCES.md)
@@ -635,10 +636,10 @@ function Compliance({ state, now }: { state: PreviewState; now: number }) {
 function DivisionCapacity() {
   return (
     <Card>
-      <CardHeader title="Division capacity" description="Filled slots of roster capacity" />
+      <CardHeader title="Division capacity" description="Official roster, TPD | Divisions tab" />
       <ul className="flex flex-col gap-3 border-t border-line px-4 py-4">
         {DIVISIONS.map((d) => {
-          const filled = allMembers().filter((m) => m.divisions.includes(d.name)).length;
+          const { filled } = divisionStaffing(d);
           return (
             <li key={d.slug}>
               <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">

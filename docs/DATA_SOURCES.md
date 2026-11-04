@@ -28,8 +28,9 @@ Last verified: 2026-11-03. All sources were read through authenticated Google AP
 | TPD \| Records | 114×16 | Disciplinary records: member, action, date, description, issued by | **Empty** (header only) |
 | TPD - Numbers by Rank | 39×6 | Formula-driven filled/total counts | Two formula errors (PC-04) |
 
-### Current headcount (from RS, 2026-11-03)
-12 filled roster slots out of 134 sworn slots; 5 filled division slots. Every filled
+### Current headcount (from RS, re-checked 2026-11-04)
+13 filled roster slots out of 134 sworn slots (2026-11-03: 12); 5 filled division slots.
+The verified snapshot used by the site is `src/lib/department` (see its `sources.ts`). Every filled
 member shows "0 Points (Safe)". These are real figures and the only ones the app may show
 until it holds its own data.
 

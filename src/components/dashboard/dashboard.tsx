@@ -187,9 +187,9 @@ function TrainingHero() {
         <p className="display mt-2 text-[40px] leading-none font-bold tracking-tight tabular">
           {done}
           <span className="text-on-dark-muted">/{TRAINING_MODULES.length}</span>
-          <span className="ml-2 text-base font-medium text-on-dark-muted">modules signed off</span>
+          <span className="ml-2 text-base font-medium text-on-dark-muted">steps complete</span>
         </p>
-        <ol className="mt-4 grid grid-cols-6 gap-1.5" aria-label="Training modules">
+        <ol className="mt-4 grid grid-cols-7 gap-1.5" aria-label="Training steps">
           {TRAINING_MODULES.map((m) => (
             <li key={m.key} title={`${m.title}: ${m.state}`} className={cn("h-2 rounded-full", m.state === "Complete" ? "bg-gold" : m.state === "In progress" ? "bg-gold/40" : "bg-white/10")}>
               <span className="sr-only">
@@ -414,7 +414,7 @@ function MyAttention({ state, probationary }: { state: PreviewState; probationar
   }
   if (probationary) {
     const left = TRAINING_MODULES.filter((m) => m.state !== "Complete");
-    if (left.length) items.push({ key: "training", href: "/hq/training", title: `${left.length} training modules outstanding`, detail: `Next: ${left[0].title}`, pill: { label: "Training", tone: "info" } });
+    if (left.length) items.push({ key: "training", href: "/hq/training", title: `${left.length} training steps outstanding`, detail: `Next: ${left[0].title}`, pill: { label: "Training", tone: "info" } });
   }
   const decisions = notificationsFor(state).filter((n) => !state.readNotifications.includes(n.id) && !n.id.includes(":queue:") && n.href.startsWith("/hq/requests"));
   for (const n of decisions.slice(0, 3)) items.push({ key: n.id, href: n.href, title: n.title, detail: n.body, pill: { label: "Unread", tone: "gold" } });

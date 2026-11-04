@@ -552,7 +552,7 @@ export function Fleet() {
       />
       <ul className="divide-y divide-line border-t border-line">
         {VEHICLES.map((v) => {
-          const ok = vehicleAuthorized(me.member.rank, v.minRank);
+          const ok = vehicleAuthorized(me.member.rank, v);
           return (
             <li key={v.name} className={cn("flex items-center gap-3 px-4 py-2", !ok && "opacity-55")}>
               <div className="min-w-0 flex-1">

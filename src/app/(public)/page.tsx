@@ -5,35 +5,19 @@ import { ArrowRight, ArrowUpRight, Car, FileText, Megaphone, Radio, Scale, Star,
 import { Badge } from "@/components/ui/identity";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { DIVISIONS } from "@/lib/sample-data";
-import { APPLICATION_URL, HANDBOOK_URL, USE_OF_FORCE_URL } from "@/lib/public-nav";
+import { CORE_VALUES, DISTRICTS, DIVISIONS, POSITIONS, SOURCES, TIERS, TRAINING_PATHWAY, VERIFIED_ON, byTier, divisionStaffing, positionByCallsign, staffing } from "@/lib/department";
+import { APPLICATION_URL } from "@/lib/public-nav";
 
-/** HB §3.1: the steps every new officer completes. */
-const PATHWAY = [
-  { title: "Apply", body: "Complete the recruitment application. The recruitment team reviews every submission." },
-  { title: "Onboarding", body: "Join as a Probationary Patrol Officer and meet the department." },
-  { title: "Policy review", body: "Study the Personnel Handbook and the Use of Force Policy." },
-  { title: "AnchorCAD and radio", body: "Learn incident reporting in AnchorCAD and radio communication." },
-  { title: "Patrol with a PTO", body: "Ride with a Police Training Officer approved by the Office of the Chiefs." },
-  { title: "Independent patrol", body: "The Office of the Chiefs signs you off to patrol on your own." },
-];
+/** HB §3.1: applying, then the seven steps to independent patrol. */
+const PATHWAY = [{ title: "Apply", detail: "Complete the recruitment application. Successful applicants are appointed Probationary Patrol Officers." }, ...TRAINING_PATHWAY];
 
-/** HB §2. */
-const VALUES = [
-  ["Integrity", "Act honestly, ethically and transparently in all duties."],
-  ["Accountability", "Accept responsibility for actions and decisions, including mistakes."],
-  ["Service", "Put the safety and well-being of the community first."],
-  ["Professionalism", "Appropriate conduct, appearance and communication at all times."],
-  ["Respect", "Treat everyone with dignity, fairness and impartiality."],
-];
+const STAFF = staffing();
 
-/** Ranks and tiers as grouped on the department roster. Names appear once member sign-in launches. */
-const LEADERSHIP = [
-  { tier: 4, group: "Office of the Chiefs", ranks: ["Chief of Police", "Deputy Chief", "Assistant Chief"] },
-  { tier: 3, group: "Command Staff", ranks: ["Major", "Captain"] },
-  { tier: 2, group: "Field Supervisory", ranks: ["Lieutenant", "Sergeant"] },
-  { tier: 1, group: "Patrol Bureau", ranks: ["Corporal", "Senior Officer", "Officer", "Reserve Officer", "Probationary Officer"] },
-];
+/** Leadership as listed on the official roster, most senior first. Vacant positions say so. */
+const LEADERSHIP = TIERS.filter((t) => t.tier !== "Patrol Bureau").map((t) => ({
+  ...t,
+  rows: byTier(t.tier).filter((x) => !/^X-[45]\d\d$/.test(x.callsign ?? "")),
+}));
 
 const NEWS = ANNOUNCEMENTS;
 
@@ -74,7 +58,7 @@ export default function HomePage() {
             <p className="text-2xs text-muted">Personnel Handbook §2</p>
           </div>
           <ul className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
-            {VALUES.map(([title, body], i) => (
+            {CORE_VALUES.map(({ title, body }, i) => (
               <li key={title} className="bg-surface p-5">
                 <span className="text-3xs font-semibold text-gold-ink tabular">0{i + 1}</span>
                 <p className="mt-2 text-sm font-semibold">{title}</p>
@@ -94,18 +78,18 @@ export default function HomePage() {
               From application to your first solo shift
             </h2>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-ink-2">
-              Every officer follows the same pathway set out in the Personnel Handbook (§3.1). Probationary officers patrol with a Police Training Officer until the Office of the Chiefs approves them for independent patrol.
+              Every officer follows the pathway in the Personnel Handbook (§3.1). New officers join as Probationary Patrol Officers and train with a Police Training Officer selected by the Office of the Chiefs, who then approve them for independent patrol.
             </p>
             <a href={APPLICATION_URL} target="_blank" rel="noopener noreferrer" className={cn(buttonClass("primary", "lg"), "mt-7")}>
               Start your application <ArrowUpRight aria-hidden className="size-4" />
             </a>
           </div>
-          <ol className="relative grid gap-3 sm:grid-cols-2">
+          <ol className="relative grid grid-cols-1 gap-3 sm:grid-cols-2">
             {PATHWAY.map((step, i) => (
               <li key={step.title} className={cn("relative rounded-lg border p-5", i === PATHWAY.length - 1 ? "border-obsidian bg-obsidian text-on-dark" : "border-line bg-surface")}>
                 <span className={cn("display text-2xl font-bold tabular", i === PATHWAY.length - 1 ? "text-gold" : "text-gold-ink")}>{String(i + 1).padStart(2, "0")}</span>
                 <p className="mt-2 text-sm font-semibold">{step.title}</p>
-                <p className={cn("mt-1 text-xs leading-relaxed", i === PATHWAY.length - 1 ? "text-on-dark-muted" : "text-muted")}>{step.body}</p>
+                <p className={cn("mt-1 text-xs leading-relaxed", i === PATHWAY.length - 1 ? "text-on-dark-muted" : "text-muted")}>{step.detail}</p>
               </li>
             ))}
           </ol>
@@ -118,9 +102,9 @@ export default function HomePage() {
         <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,transparent,var(--obsidian)_85%)]" />
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-16 text-center sm:grid-cols-3 sm:px-6 lg:px-8">
           {[
-            ["2", "patrol districts"],
-            ["6", "specialized divisions"],
-            ["134", "sworn positions"],
+            [String(DISTRICTS.length), "patrol districts"],
+            [String(DIVISIONS.length), "specialized divisions"],
+            [`${STAFF.filled} / ${STAFF.authorized}`, "sworn members of authorized positions"],
           ].map(([n, l]) => (
             <div key={l}>
               <p className="display-x text-5xl font-bold text-gold tabular">{n}</p>
@@ -138,23 +122,34 @@ export default function HomePage() {
             Two patrol districts
           </h2>
           <p className="mt-3 max-w-2xl text-sm text-ink-2">Patrol is organized into a North and a South district, each with its own Lieutenants, Sergeants and patrol officers.</p>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {[
-              { name: "North District", calls: "X-4xx" },
-              { name: "South District", calls: "X-5xx" },
-            ].map((d) => (
-              <div key={d.name} className="group relative overflow-hidden rounded-xl border border-line bg-surface p-7 shadow-sm">
-                <span aria-hidden className="display-x pointer-events-none absolute -right-2 -bottom-6 text-[120px] leading-none font-bold text-sunken select-none">
-                  {d.name[0]}
-                </span>
-                <Radio className="size-5 text-gold-ink" aria-hidden />
-                <p className="display mt-4 text-xl font-bold">{d.name}</p>
-                <p className="mt-1 text-xs text-muted">
-                  Call signs <span className="font-semibold text-ink tabular">{d.calls}</span>
-                </p>
-                <p className="relative mt-6 text-xs text-ink-2">Lieutenants · Sergeants · Corporals · Senior Officers · Officers</p>
-              </div>
-            ))}
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {DISTRICTS.map((d) => {
+              const cpt = positionByCallsign(d.captain);
+              return (
+                <div key={d.name} className="group relative overflow-hidden rounded-xl border border-line bg-surface p-7 shadow-sm">
+                  <span aria-hidden className="display-x pointer-events-none absolute -right-2 -bottom-6 text-[120px] leading-none font-bold text-sunken select-none">
+                    {d.name[0]}
+                  </span>
+                  <Radio className="size-5 text-gold-ink" aria-hidden />
+                  <p className="display mt-4 text-xl font-bold">{d.name} District</p>
+                  <p className="mt-1 text-xs text-muted">
+                    Call signs <span className="font-semibold text-ink tabular">{d.callsignRange}</span>
+                  </p>
+                  <dl className="relative mt-6 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <dt className="text-3xs text-muted">District captain</dt>
+                      <dd className="font-semibold">{cpt?.holder ?? "Vacant"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-3xs text-muted">Members</dt>
+                      <dd className="font-semibold tabular">
+                        {d.filled} of {d.authorized} positions
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -171,14 +166,25 @@ export default function HomePage() {
               <p className="mt-3 max-w-2xl text-sm text-ink-2">Members may serve in up to three subdivisions at any rank alongside patrol (Handbook §9.3).</p>
             </div>
           </div>
-          <ul className="mt-8 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-8 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
             {DIVISIONS.map((d) => (
               <li key={d.slug} className="flex flex-col bg-surface p-6">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-base font-semibold">{d.name}</h3>
                   <span className="shrink-0 rounded-full bg-obsidian px-2.5 py-0.5 text-3xs font-bold text-gold">{d.callsign ? `${d.callsign} · ${d.prefix}` : d.prefix}</span>
                 </div>
-                <p className="mt-auto pt-6 text-2xs text-muted">{d.capacity} positions on the roster</p>
+                <dl className="mt-auto grid grid-cols-2 gap-3 pt-6 text-xs">
+                  <div>
+                    <dt className="text-3xs text-muted">Commander</dt>
+                    <dd className="font-semibold">{positionByCallsign(d.command.commander)?.holder ?? "Vacant"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-3xs text-muted">Positions</dt>
+                    <dd className="font-semibold tabular">
+                      {divisionStaffing(d).filled} of {d.capacity} filled
+                    </dd>
+                  </div>
+                </dl>
               </li>
             ))}
           </ul>
@@ -192,24 +198,42 @@ export default function HomePage() {
           <h2 id="lead-h" className="display mt-2 text-3xl font-bold tracking-tight">
             Leadership
           </h2>
-          <p className="mt-3 max-w-2xl text-sm text-ink-2">The department is led by the Office of the Chiefs. Member names will appear here once sign-in and the roster connection launch.</p>
-          <ol className="mt-8 grid gap-3 md:grid-cols-4">
+          <p className="mt-3 max-w-2xl text-sm text-ink-2">
+            The department is led by the Office of the Chiefs. Positions are shown as listed on the official roster (checked {VERIFIED_ON}); unfilled positions are marked vacant.
+          </p>
+          <ol className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
             {LEADERSHIP.map((g) => (
-              <li key={g.group} className={cn("rounded-xl p-5", g.tier === 4 ? "bg-obsidian text-on-dark" : "border border-line bg-surface")}>
-                <span aria-label={`${g.tier} star tier`} className="flex gap-0.5">
-                  {Array.from({ length: g.tier }, (_, i) => (
-                    <Star key={i} aria-hidden strokeWidth={0} className={cn("size-3 fill-current", g.tier === 4 ? "text-gold" : "text-gold-ink")} />
-                  ))}
-                </span>
-                <p className="mt-3 text-sm font-semibold">{g.group}</p>
-                <ul className={cn("mt-2 flex flex-col gap-1 text-xs", g.tier === 4 ? "text-on-dark-muted" : "text-muted")}>
-                  {g.ranks.map((r) => (
-                    <li key={r}>{r}</li>
+              <li key={g.tier} className={cn("rounded-xl p-5", g.stars === 4 ? "bg-obsidian text-on-dark md:col-span-2" : "border border-line bg-surface")}>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">{g.tier}</p>
+                  <span aria-label={`${g.stars} star tier`} className="flex gap-0.5">
+                    {Array.from({ length: g.stars }, (_, i) => (
+                      <Star key={i} aria-hidden strokeWidth={0} className={cn("size-3 fill-current", g.stars === 4 ? "text-gold" : "text-gold-ink")} />
+                    ))}
+                  </span>
+                </div>
+                <ul className={cn("mt-3 grid grid-cols-1 gap-x-6 gap-y-2.5", g.stars === 4 && "sm:grid-cols-2 lg:grid-cols-4")}>
+                  {g.rows.map((x, i) => (
+                    <li key={`${x.callsign}-${i}`} className="flex items-baseline justify-between gap-3 text-xs">
+                      <span className="min-w-0">
+                        <span className={cn("block truncate font-semibold", !x.holder && (g.stars === 4 ? "text-on-dark-muted" : "text-muted"))}>{x.holder ?? "Vacant"}</span>
+                        <span className={cn("block truncate text-3xs", g.stars === 4 ? "text-on-dark-muted" : "text-muted")}>
+                          {x.rank} · {x.appointment}
+                        </span>
+                      </span>
+                      <span className={cn("shrink-0 text-3xs font-semibold tabular", g.stars === 4 ? "text-gold" : "text-gold-ink")}>{x.callsign ?? "—"}</span>
+                    </li>
                   ))}
                 </ul>
               </li>
             ))}
           </ol>
+          <p className="mt-4 text-2xs text-muted">
+            {POSITIONS.length - STAFF.vacant - LEADERSHIP.reduce((n, g) => n + g.rows.filter((x) => x.holder).length, 0)} further members serve in the North and South district patrol blocks.{" "}
+            <a href={SOURCES.roster.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-gold-ink hover:underline">
+              Official roster
+            </a>
+          </p>
         </div>
       </section>
 
@@ -219,7 +243,7 @@ export default function HomePage() {
           <h2 id="svc-h" className="display text-3xl font-bold tracking-tight">
             Services
           </h2>
-          <ul className="mt-8 grid gap-4 md:grid-cols-3">
+          <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
             <Service icon={UserPlus} title="Join the department" body="Apply through the recruitment application. Every submission is reviewed by the recruitment team." cta={{ href: APPLICATION_URL, label: "Apply", external: true }} />
             <Service icon={Car} title="Ride-along program" body="Civilians request a ride-along with an available TPD officer. The officer’s Sergeant or above approves it before it begins (Handbook §12.1)." />
             <Service icon={Megaphone} title="Public communications" body="Official announcements and press releases come only from the Office of Public Affairs (Handbook §14.1)." />
@@ -249,8 +273,8 @@ export default function HomePage() {
             <p className="mt-2 text-xs text-muted">The official documents are the final word. Incident reports are filed in AnchorCAD (Handbook §10).</p>
             <ul className="mt-6 flex flex-col gap-3">
               {[
-                { href: HANDBOOK_URL, icon: FileText, title: "Personnel Policy & Procedures Handbook", meta: "Effective October 30, 2026" },
-                { href: USE_OF_FORCE_URL, icon: Scale, title: "Use of Force Policy", meta: "Issued October 30, 2026" },
+                { href: SOURCES.handbook.href, icon: FileText, title: "Personnel Policy & Procedures Handbook", meta: "Effective October 30, 2026" },
+                { href: SOURCES.useOfForce.href, icon: Scale, title: "Use of Force Policy", meta: "Dated October 30, 2026" },
               ].map((doc) => (
                 <li key={doc.title}>
                   <a href={doc.href} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 rounded-xl border border-line bg-surface p-5 shadow-sm transition-colors hover:border-line-strong">

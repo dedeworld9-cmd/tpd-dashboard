@@ -1,13 +1,15 @@
 /**
- * FICTIONAL SAMPLE DATA for Milestone 1 design screens.
+ * FICTIONAL DEMO DATA for the design preview (labelled "Sample" in the UI).
  *
  * Every person, number and request below is invented to exercise the layouts.
- * None of it describes real TPD members or real activity. The structure (ranks,
- * districts, divisions, fleet rules) follows the official sources cited in
- * docs/REQUIREMENTS.md. Real data arrives with Milestone 2 and replaces this file.
+ * None of it describes real TPD members or real activity: the names below are
+ * invented personas used to demonstrate patrol, requests and command workflows.
+ * Verified department information lives in src/lib/department. Real member
+ * data arrives with Discord sign-in (Milestone 2) and replaces this file.
  */
 
 import { RANKS, type Rank } from "./authz";
+import { TRAINING_PATHWAY, type TrainingStepKey } from "./department";
 export { RANKS, type Rank };
 
 export type District = "North" | "South" | "Department";
@@ -58,28 +60,8 @@ export const MEMBERS: Member[] = [
   { id: "m-14", name: "B. Halvorsen", callsign: "X-549", rank: "Reserve Officer", district: "South", appointment: "Patrol Bureau", divisions: [], status: "Active", weekMinutes: 0, onDuty: false, timezone: "MST" },
 ];
 
-/** Fleet matrix from the roster's TPD | Vehicles tab (official structure, not sample). */
-export const VEHICLES = [
-  { name: "2015 Charger", model: "Bullhorn Prancer Pursuit 2015", minRank: "Probationary Officer" as Rank, use: "General patrol" },
-  { name: "2019 FPIU", model: "Falcon Interceptor Utility 2019", minRank: "Senior Officer" as Rank, use: "General patrol" },
-  { name: "2024 FPIU", model: "Falcon Interceptor Utility 2024", minRank: "Sergeant" as Rank, use: "Field supervision and command" },
-];
-
-/** Reserve Officers rank below Probationary in the list but are authorized like Officers for the Charger only. */
-export function vehicleAuthorized(rank: Rank, minRank: Rank): boolean {
-  if (rank === "Reserve Officer") return minRank === "Probationary Officer";
-  return RANKS.indexOf(rank) <= RANKS.indexOf(minRank);
-}
-
-/** Division capacity from the roster's TPD | Divisions tab (official structure). */
-export const DIVISIONS = [
-  { slug: "waterfront", name: "Waterfront Unit", callsign: "Whiskey", prefix: "W", capacity: 12, branch: "Unassigned" },
-  { slug: "traffic-interdiction", name: "Traffic Interdiction Unit", callsign: "Tango", prefix: "T", capacity: 12, branch: "Unassigned" },
-  { slug: "public-affairs", name: "Office of Public Affairs", callsign: "", prefix: "PA", capacity: 5, branch: "Administrative" },
-  { slug: "internal-affairs", name: "Internal Affairs Division", callsign: "", prefix: "IA", capacity: 6, branch: "Administrative" },
-  { slug: "strategic-operations", name: "Strategic Operations Division", callsign: "Delta", prefix: "D", capacity: 10, branch: "Unassigned" },
-  { slug: "swat", name: "SWAT", callsign: "Adam", prefix: "A", capacity: 22, branch: "Unassigned" },
-] as const;
+// Official department structure (fleet, divisions) comes from the verified module.
+export { VEHICLES, vehicleAuthorized, DIVISIONS } from "./department";
 
 export type RequestState = "Draft" | "Submitted" | "Under review" | "Approved" | "Denied" | "Withdrawn";
 
@@ -122,12 +104,19 @@ export const MY_SESSIONS: PatrolSession[] = [
   { id: "PS-2214", date: "Tue, Oct 27", district: "North", start: "20:15", end: "21:40", minutes: 85 },
 ];
 
-/** HB §3.1 probationary pathway — the six modules are policy, progress is sample. */
-export const TRAINING_MODULES = [
-  { key: "onboarding", title: "TPD onboarding", detail: "Department structure and chain of command.", state: "Complete" as const, signedBy: "M. Okonkwo (PTO)", date: "Oct 30" },
-  { key: "policy", title: "Policy review", detail: "Personnel Handbook and Use of Force Policy.", state: "Complete" as const, signedBy: "M. Okonkwo (PTO)", date: "Oct 31" },
-  { key: "anchorcad", title: "AnchorCAD training", detail: "Arrests, citations, incidents and bodycam attachments.", state: "In progress" as const, signedBy: null, date: null },
-  { key: "radio", title: "Radio communications", detail: "Call signs, radio procedure and jurisdiction notifications.", state: "Not started" as const, signedBy: null, date: null },
-  { key: "patrol", title: "Patrol procedures", detail: "Traffic stops, pursuit authorization, district boundaries.", state: "Not started" as const, signedBy: null, date: null },
-  { key: "pto", title: "PTO mentorship", detail: "Supervised patrols with your assigned PTO and a final evaluation.", state: "Not started" as const, signedBy: null, date: null },
-];
+/**
+ * HB §3.1 pathway steps are official (src/lib/department/policy.ts). The
+ * progress states below are SAMPLE values for the fictional demo persona only,
+ * so the trainee layout can be reviewed. No real sign-offs are recorded.
+ */
+const SAMPLE_PROGRESS: Record<TrainingStepKey, "Complete" | "In progress" | "Not started"> = {
+  onboarding: "Complete",
+  policy: "Complete",
+  anchorcad: "In progress",
+  radio: "Not started",
+  patrol: "Not started",
+  pto: "Not started",
+  approval: "Not started",
+};
+
+export const TRAINING_MODULES = TRAINING_PATHWAY.map((step) => ({ ...step, state: SAMPLE_PROGRESS[step.key] }));

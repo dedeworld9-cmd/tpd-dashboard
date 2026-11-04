@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Download, Users } from "lucide-react";
@@ -129,8 +131,16 @@ export function PersonnelWorkspace() {
       <PageHeader
         eyebrow="Department"
         title="Personnel"
-        description="The department roster with live duty status and weekly activity. Open a member for their profile."
-        meta={<Pill tone="amber">Sample roster · real members load from the official sheet in Milestone 2</Pill>}
+        description={
+          <>
+            Demonstrates duty status, weekly activity and admin tools using fictional demo personas. The real roster, with every position and vacancy, is on{" "}
+            <Link href="/hq/structure" className="font-semibold text-gold-ink hover:underline">
+              Department structure
+            </Link>
+            .
+          </>
+        }
+        meta={<Pill tone="amber">Demo personas · fictional, not TPD members</Pill>}
       />
       <Card>
         <DataTable

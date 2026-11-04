@@ -70,3 +70,18 @@ Remaining
 - dede's review of the design. Not deployed, and must not be until dede approves the design and the release.
 - Milestone 2 blockers are unchanged: Discord application, Supabase project, AnchorCAD URL, and policy conflicts PC-06, 07, 08, 14 and 16.
 - The badge source is 207×265 px; a higher-resolution original would sharpen the hero.
+
+## Department information integration · complete in development, not deployed (2026-11-04)
+
+Done
+- One verified data module, `src/lib/department` (sources, roster positions, divisions, fleet, policy), transcribed from RS, HB and UoF on 2026-11-04. `sample-data.ts` re-exports divisions and fleet from it and now holds only fictional demo personas, sessions and requests.
+- Roster: all 134 authorized positions with tier, district, appointment and holder (13 sworn; 121 vacant). Active duty 13/126, probationary 0/8, matching Numbers by Rank.
+- Divisions: all 67 slots across the six divisions with holders; commanders and assistants linked to their X-3xx positions. Branch shown only where a source assigns one (IA and OPA: Administrative Operations).
+- Fleet: the three approved vehicles with model, livery, use and status, and the rank matrix cell by cell.
+- Policy: core values, purpose, 3-hour weekly requirement and exceptions, seven-step HB §3.1 pathway, HB §13 discipline ladder (policy only), promotion eligibility, and a categorized section index of HB and UoF.
+- Pages: homepage (values, pathway, districts with captain and staffing, divisions with commander and staffing, full leadership with vacancies, 13 / 134 band); new HQ **Structure** page; division pages list every slot; Resources adds the policy library, activity rule, discipline ladder and fleet details; Training shows the seven steps and no invented sign-offs; Command Center division capacity uses official counts; Personnel is labelled as demo personas.
+- Tests: `tests/unit/department.test.ts` (counts against Numbers by Rank, divisions, fleet, pathway, discipline, and a guard that fails on any Discord-ID-shaped number in `src`); E2E for the homepage leadership and the Structure page; mobile overflow test covers Structure, Resources and a division page.
+
+Never copied (restricted): Discord IDs, Roblox usernames, timezones, hire and resignation dates, disciplinary points, TPD | Records.
+
+Open: PC-26 to PC-29 (docs/POLICY_CONFLICTS.md). Names on the public site await dede's decision (PC-29). Not deployed: the gh-pages preview still shows the previous build.

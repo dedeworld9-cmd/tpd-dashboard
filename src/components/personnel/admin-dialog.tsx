@@ -38,8 +38,8 @@ function consequences(before: Member, after: Member) {
   const b: Actor = actorFor(after);
   const gained = VISIBLE_CAPS.filter(([c]) => !can(a, c) && can(b, c)).map(([, l]) => l);
   const lost = VISIBLE_CAPS.filter(([c]) => can(a, c) && !can(b, c)).map(([, l]) => l);
-  const vGained = VEHICLES.filter((v) => !vehicleAuthorized(before.rank, v.minRank) && vehicleAuthorized(after.rank, v.minRank)).map((v) => v.name);
-  const vLost = VEHICLES.filter((v) => vehicleAuthorized(before.rank, v.minRank) && !vehicleAuthorized(after.rank, v.minRank)).map((v) => v.name);
+  const vGained = VEHICLES.filter((v) => !vehicleAuthorized(before.rank, v) && vehicleAuthorized(after.rank, v)).map((v) => v.name);
+  const vLost = VEHICLES.filter((v) => vehicleAuthorized(before.rank, v) && !vehicleAuthorized(after.rank, v)).map((v) => v.name);
   return { gained, lost, vGained, vLost };
 }
 
