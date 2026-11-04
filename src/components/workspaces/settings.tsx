@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton, toast } from "@/components/ui/feedback";
 import { Card, CardHeader } from "@/components/ui/surface";
 import { cn } from "@/lib/cn";
+import { useIsLive } from "@/lib/backend/auth";
 import { useMe } from "@/lib/preview/hooks";
 import { resetPreview, ROLE_PERSONA, setRole, type PreviewRole } from "@/lib/preview/store";
 
 export function SettingsWorkspace() {
   const me = useMe();
+  const live = useIsLive();
   const theme = useTheme();
   const { collapsed, toggleCollapsed, openShortcuts } = useShell();
   if (!me) {
@@ -24,7 +26,7 @@ export function SettingsWorkspace() {
   }
   return (
     <Page>
-      <PageHeader eyebrow="Personal" title="Settings" description="Appearance and preview controls. Account settings arrive with Discord sign-in." />
+      <PageHeader eyebrow="Personal" title="Settings" description={live ? "Appearance and keyboard shortcuts." : "Appearance and preview controls. Account settings arrive with Discord sign-in."} />
       <div className="flex max-w-3xl flex-col gap-5">
         <Card>
           <CardHeader title="Appearance" />
@@ -56,7 +58,7 @@ export function SettingsWorkspace() {
           </div>
         </Card>
 
-        <Card>
+        {live ? null : <Card>
           <CardHeader title="Design preview" description="These controls exist only while the portal runs on sample data" />
           <div className="grid grid-cols-1 gap-2 border-t border-line p-4 sm:grid-cols-2">
             {(Object.keys(ROLE_PERSONA) as PreviewRole[]).map((r) => (
@@ -79,11 +81,15 @@ export function SettingsWorkspace() {
               <RotateCcw className="size-3.5" aria-hidden /> Reset
             </Button>
           </div>
-        </Card>
+        </Card>}
 
         <Card>
-          <CardHeader title="Account" description="Available after Discord sign-in (Milestone 2)" />
-          <p className="border-t border-line px-4 py-3.5 text-2xs text-muted">Your name, rank and call sign will come from the official roster. Linked Discord account, sign-out and session management appear here.</p>
+          <CardHeader title="Account" description={live ? "Signed in with Discord" : "Available after Discord sign-in (Milestone 2)"} />
+          <p className="border-t border-line px-4 py-3.5 text-2xs text-muted">
+            {live
+              ? "Your name, rank, call sign, district and appointments come from the official roster and cannot be edited here. To correct them, ask your chain of command to update the roster. Sign out from the account menu."
+              : "Your name, rank and call sign will come from the official roster. Linked Discord account, sign-out and session management appear here."}
+          </p>
         </Card>
       </div>
     </Page>

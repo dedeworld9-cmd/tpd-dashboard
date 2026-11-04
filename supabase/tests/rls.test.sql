@@ -141,4 +141,29 @@ do $$ begin
 end $$;
 reset role;
 
+-- 11. Hardened apply: duplicate Discord ID and member-less snapshots are refused; unqualified-delete safe (WHERE true);
+--     my_membership carries the member's own id; a Captain's own verification row is never someone else's.
+set role service_role;
+do $$ begin
+  begin perform tpd.apply_roster_snapshot($j${"members": [
+      {"discordId": "100000000000000001", "name": "A", "callsign": "X-101", "rank": "Chief of Police", "tier": "Office of the Chiefs"},
+      {"discordId": "100000000000000001", "name": "B", "callsign": "X-102", "rank": "Deputy Chief", "tier": "Office of the Chiefs"}],
+    "positions": [{"ord": 1, "rank": "Officer", "appointment": "x", "tier": "Patrol Bureau"}]}$j$::jsonb, gen_random_uuid());
+    raise exception 'duplicate id applied'; exception when raise_exception then if sqlerrm like '%applied%' then raise; end if; end;
+  begin perform tpd.apply_roster_snapshot('{"members": [], "positions": [{"ord": 1, "rank": "Officer", "appointment": "x", "tier": "Patrol Bureau"}]}'::jsonb, gen_random_uuid());
+    raise exception 'memberless applied'; exception when raise_exception then if sqlerrm like '%applied%' then raise; end if; end;
+end $$;
+reset role;
+do $$ begin assert (select count(*) from tpd.personnel where status = 'active') = 2, 'refused snapshots changed nothing'; end $$;
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (tpd.my_membership() -> 'member' ->> 'id')::uuid = (select id from tpd.personnel where discord_id = '100000000000000002'), 'own id returned'; end $$;
+-- A command user's "own record" query must be filtered by Discord ID: unfiltered it returns everyone (discord-verify relied on row 0).
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+do $$ begin
+  assert (select count(*) from tpd.personnel) = 3, 'command reads all rows, so callers must filter by discord_id';
+  assert (select count(*) from tpd.personnel where discord_id = tpd.current_discord_id()) = 1, 'filtered own record';
+end $$;
+reset role;
+
 select 'ALL RLS TESTS PASSED' as result;

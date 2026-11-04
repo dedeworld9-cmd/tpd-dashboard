@@ -65,6 +65,11 @@ Deno.serve(
           const rows = await svc("roster_sync_runs?select=source_hash&status=in.(applied,no_changes)&order=finished_at.desc&limit=1");
           return rows[0]?.source_hash ?? null;
         },
+        async lastPositionCount() {
+          const rows = await svc("roster_sync_runs?select=counts&status=in.(applied,no_changes)&order=finished_at.desc&limit=1");
+          const n = rows[0]?.counts?.positions;
+          return typeof n === "number" ? n : null;
+        },
         apply: (snapshot) => svc("rpc/apply_roster_snapshot", { method: "POST", body: JSON.stringify({ snapshot, run_id: run.id }) }),
         hash: sha256,
       },

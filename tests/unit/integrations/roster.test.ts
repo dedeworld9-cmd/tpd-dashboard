@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RANKS as APP_RANKS } from "@/lib/authz";
-import { buildSnapshot, diffMembers, parseDivisions, parseRoster, RANKS, removalGuard, type CurrentMember, type Rows } from "../../../supabase/functions/_shared/roster.ts";
+import { buildSnapshot, diffMembers, parseDivisions, parseRoster, positionShrinkGuard, RANKS, removalGuard, type CurrentMember, type Rows } from "../../../supabase/functions/_shared/roster.ts";
 import { runRosterSync, publicChanges, type SyncDeps } from "../../../supabase/functions/_shared/roster-sync.ts";
 import { divisionRows, id, rosterRows } from "./fixtures";
 
@@ -107,6 +107,52 @@ describe("roster validation", () => {
   });
 });
 
+describe("roster validation: identity and call signs", () => {
+  it("rejects a malformed call sign on a filled slot but treats a placeholder on a vacant slot as none", () => {
+    const bad = build(rosterRows({ extra: [["", "", "", "", "XX-9", "H. Bad", id(50), "", "Officer", "Patrol Bureau"]] }));
+    expect(bad.ok).toBe(false);
+    expect(bad.issues.map((i) => i.code)).toContain("invalid_callsign");
+    const vacant = build(rosterRows({ extra: [["", "", "", "", "—", "", "", "", "Captain", "TBD Commander"]] }));
+    expect(vacant.ok).toBe(true);
+    expect(vacant.snapshot.positions.at(-1)?.callsign).toBeNull();
+  });
+
+  it("maps the exact Discord ID to the member and never matches by name", () => {
+    const r = build();
+    const f = r.snapshot.members.find((m) => m.name === "F. Officer")!;
+    expect(f).toMatchObject({ discordId: id(6), callsign: "X-425", rank: "Officer", district: "North" });
+    // The same name under a different ID is a different person, and is flagged.
+    const twin = build(rosterRows({ extra: [["", "", "", "", "X-530", "F. Officer", id(77), "", "Officer", "Patrol Bureau"]] }));
+    expect(twin.snapshot.members.filter((m) => m.name === "F. Officer")).toHaveLength(2);
+    expect(twin.issues.map((i) => i.code)).toContain("duplicate_name");
+  });
+
+  it("rejects a read where nobody has a valid Discord ID", () => {
+    const rows = rosterRows();
+    for (const r of rows) if (typeof r[6] === "string" && /^9\d{17}$/.test(r[6])) r[6] = "";
+    const r = build(rows);
+    expect(r.ok).toBe(false);
+    expect(r.issues.map((i) => i.code)).toContain("no_members");
+  });
+
+  it("warns when a member holds more than three division slots (HB §9.3)", () => {
+    const d = divisionRows();
+    const extra = ["W-20", "W-21", "W-22", "W-23"].map((c) => ["", "", "", "", c, "F. Officer", id(6), "", "Officer", "Waterfront Unit", "", ""]);
+    const r = build(rosterRows(), [...d, ...extra]);
+    expect(r.issues.map((i) => i.code)).toContain("too_many_divisions");
+    expect(r.ok).toBe(true);
+  });
+});
+
+describe("incomplete imports", () => {
+  it("rejects a read with far fewer positions than the last import unless command confirms", () => {
+    expect(positionShrinkGuard(134, 40, false)?.code).toBe("positions_shrunk");
+    expect(positionShrinkGuard(134, 40, true)).toBeNull();
+    expect(positionShrinkGuard(134, 120, false)).toBeNull();
+    expect(positionShrinkGuard(null, 5, false)).toBeNull();
+  });
+});
+
 describe("change detection", () => {
   it("detects rank, call sign and district changes, new members and former members", () => {
     const before = current();
@@ -150,6 +196,7 @@ describe("sync orchestration", () => {
       readSheets: async () => ({ roster: rosterRows(), divisions: divisionRows() }),
       loadCurrent: async () => [],
       lastAppliedHash: async () => null,
+      lastPositionCount: async () => null,
       apply: async (s) => {
         applied.push(s);
         return { members: s.members.length, markedFormer: 0 };
@@ -194,6 +241,24 @@ describe("sync orchestration", () => {
     const r = await runRosterSync(d, "apply");
     expect(r.status).toBe("rejected");
     expect(r.issues.map((i) => i.code)).toContain("mass_removal");
+    expect(applied).toHaveLength(0);
+  });
+
+  it("a truncated sheet is rejected before it can replace the last valid roster", async () => {
+    const { d, applied } = deps({
+      lastPositionCount: async () => 134,
+      readSheets: async () => ({ roster: rosterRows(), divisions: divisionRows() }),
+    });
+    const r = await runRosterSync(d, "apply");
+    expect(r.status).toBe("rejected");
+    expect(r.issues.map((i) => i.code)).toContain("positions_shrunk");
+    expect(applied).toHaveLength(0);
+    expect((await runRosterSync(d, "apply", { confirmRemovals: true })).status).toBe("applied");
+  });
+
+  it("a failure reading prior state fails the run without applying", async () => {
+    const { d, applied } = deps({ lastPositionCount: async () => Promise.reject(new Error("database request failed (502)")) });
+    expect((await runRosterSync(d, "apply")).status).toBe("failed");
     expect(applied).toHaveLength(0);
   });
 

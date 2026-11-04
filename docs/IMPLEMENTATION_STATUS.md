@@ -101,3 +101,9 @@ Blocked on credentials (nothing is connected)
 - AnchorCAD member matching, report references and duty sync are unsupported, because the API response fields are undocumented.
 
 Not deployed: the live preview does not include Phase 2.
+
+## Phase 1: real member access · code complete, not deployed or live-tested (2026-11-04)
+- HQ is gated on verified roster membership when a backend is configured; demo personas and mutations are removed from live mode (store live layer, `LiveGate`, `LiveSwitch`).
+- Real directory (Personnel), Overview and Command Center staffing come from RLS-protected views. Patrol, Activity, Training, Requests, Supervisor are closed ("not connected yet").
+- Fixes: `discord-verify` matched command users to the wrong personnel row; `apply_roster_snapshot` used unqualified DELETEs; expired sessions looked like outages. New: call-sign validation, no-member and position-shrink import guards, duplicate-name and >3-division warnings.
+- Needs a real member to verify: Discord sign-in end to end, the server-membership check, and gateway JWT acceptance. See docs/INTEGRATIONS.md, "Pending on the live project".

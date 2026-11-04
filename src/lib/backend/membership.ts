@@ -4,6 +4,8 @@ import { DIVISIONS, VEHICLES, vehicleAuthorized } from "@/lib/department";
 export type MembershipState = "signed_out" | "verified" | "unrecognized" | "former" | "inactive" | "pending_verification" | "unavailable";
 
 export interface VerifiedMember {
+  /** The member's own personnel record id (never a Discord ID). */
+  id: string;
   name: string;
   callsign: string | null;
   rank: Rank;
@@ -27,7 +29,7 @@ export function parseMembership(raw: unknown): Membership {
   const r = raw as Membership | null;
   const states: MembershipState[] = ["signed_out", "verified", "unrecognized", "former", "inactive", "pending_verification", "unavailable"];
   if (!r || typeof r !== "object" || !states.includes(r.state)) return { state: "unavailable", reason: "unexpected_response" };
-  if (r.state === "verified" && (!r.member || !(RANKS as readonly string[]).includes(r.member.rank))) return { state: "unavailable", reason: "unexpected_response" };
+  if (r.state === "verified" && (!r.member || typeof r.member.id !== "string" || !(RANKS as readonly string[]).includes(r.member.rank))) return { state: "unavailable", reason: "unexpected_response" };
   return r;
 }
 

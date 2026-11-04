@@ -10,7 +10,7 @@
  * Nothing here changes website access or Discord roles.
  */
 
-import { evaluateRoles, ownGuildMember, planRoleSync, tokenOwner, type RoleMapping } from "../_shared/discord.ts";
+import { evaluateRoles, ownGuildMember, planRoleSync, SNOWFLAKE, tokenOwner, type RoleMapping } from "../_shared/discord.ts";
 import { UpstreamError } from "../_shared/http.ts";
 import { bearer, client, handler, HttpError, recordStatus } from "../_shared/supabase.ts";
 
@@ -32,7 +32,7 @@ Deno.serve(
     await db.user(jwt);
     const asUser = db.asUser(jwt!);
     const expected: string | null = await asUser("rpc/current_discord_id", { method: "POST", body: "{}" });
-    if (!expected) throw new HttpError(403, "This account did not sign in with Discord");
+    if (!expected || !SNOWFLAKE.test(expected)) throw new HttpError(403, "This account did not sign in with Discord");
 
     let roles: string[] | null;
     try {
@@ -47,7 +47,7 @@ Deno.serve(
     }
 
     const svc = db.service();
-    const me: { id: string; rank: string; status: string }[] = await asUser("personnel?select=id,rank,status");
+    const me: { id: string; rank: string; status: string }[] = await asUser(`personnel?select=id,rank,status&discord_id=eq.${expected}`);
     const map: RoleMapping[] = await svc("discord_role_map?select=role_id,role_name,maps_to_kind,maps_to_value,confirmed_at");
     const confirmed = map.filter((m) => m.confirmed_at).length;
     await recordStatus(db, "discord_guild", confirmed ? "connected" : "verification_required", { guild: "configured", mappedRoles: map.length, confirmedRoles: confirmed, roleWrites: "disabled", method: "member token" });

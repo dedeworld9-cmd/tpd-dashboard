@@ -8,7 +8,8 @@ import { PatrolProvider } from "@/components/patrol/patrol-provider";
 import { Dialog } from "@/components/ui/overlay";
 import { Kbd } from "@/components/ui/field";
 import { Toaster } from "@/components/ui/feedback";
-import { AuthProvider } from "@/lib/backend/auth";
+import { LiveGate, NotConnected, notConnectedArea } from "@/components/auth/live-gate";
+import { AuthProvider, useIsLive } from "@/lib/backend/auth";
 import { cn } from "@/lib/cn";
 import { pushRecent } from "@/lib/preview/store";
 import { CommandPalette } from "./command-palette";
@@ -28,10 +29,12 @@ function isTyping(t: EventTarget | null) {
 export function HqShell({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <PatrolProvider>
-        <ShellInner>{children}</ShellInner>
-        <Toaster />
-      </PatrolProvider>
+      <LiveGate>
+        <PatrolProvider>
+          <ShellInner>{children}</ShellInner>
+          <Toaster />
+        </PatrolProvider>
+      </LiveGate>
     </AuthProvider>
   );
 }
@@ -45,6 +48,8 @@ function ShellInner({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState(false);
   const [newReq, setNewReq] = useState<{ open: boolean; type?: NewRequestType }>({ open: false });
   const pendingG = useRef<number>(0);
+  const live = useIsLive();
+  const closedArea = live ? notConnectedArea(pathname) : null;
 
   useEffect(() => {
     try {
@@ -72,10 +77,10 @@ function ShellInner({ children }: { children: ReactNode }) {
       toggleCollapsed,
       openPalette: () => setPalette(true),
       openShortcuts: () => setShortcuts(true),
-      openNewRequest: (type) => setNewReq({ open: true, type }),
+      openNewRequest: (type) => !live && setNewReq({ open: true, type }),
       openDrawer: () => setDrawer(true),
     }),
-    [collapsed, toggleCollapsed],
+    [collapsed, toggleCollapsed, live],
   );
 
   useEffect(() => {
@@ -103,11 +108,11 @@ function ShellInner({ children }: { children: ReactNode }) {
         setPalette(true);
       } else if (k === "?") setShortcuts(true);
       else if (k === "[") toggleCollapsed();
-      else if (k === "n" || k === "N") setNewReq({ open: true });
+      else if ((k === "n" || k === "N") && !live) setNewReq({ open: true });
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router, toggleCollapsed]);
+  }, [router, toggleCollapsed, live]);
 
   return (
     <ShellContext.Provider value={api}>
@@ -130,7 +135,7 @@ function ShellInner({ children }: { children: ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar />
           <main id="main" tabIndex={-1} className="flex-1 pb-24 outline-none lg:pb-10">
-            {children}
+            {closedArea ? <NotConnected area={closedArea} /> : children}
           </main>
         </div>
       </div>

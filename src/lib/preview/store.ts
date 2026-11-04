@@ -176,7 +176,45 @@ function seed(now: number): PreviewState {
 let state: PreviewState | null = null;
 const listeners = new Set<() => void>();
 
+// ------------------------------------------------------------ live mode
+//
+// When the backend is configured and a verified member is signed in, the store
+// holds the REAL roster (read through RLS) and nothing else: no sample members,
+// sessions or requests, no persistence to localStorage, and no mutations. Patrol,
+// requests and personnel changes have no server side yet, so they refuse to run
+// rather than pretend to save. Demo personas can therefore never appear in, or
+// be mixed into, an authenticated session.
+
+export interface LiveRoster {
+  me: Member;
+  members: Member[];
+}
+let live: LiveRoster | null = null;
+
+export const LIVE_UNAVAILABLE = "Not available yet: this workflow has no server-side record, so nothing would be saved to the department.";
+
+function emptyState(): PreviewState {
+  return { version: VERSION, role: "officer", sessions: [], requests: [], readNotifications: [], recents: [], personnel: {}, audit: [] };
+}
+
+/** Switches the store between the labelled demo (null) and the verified live roster. */
+export function setLiveRoster(next: LiveRoster | null) {
+  live = next;
+  state = next ? emptyState() : null;
+  listeners.forEach((l) => l());
+}
+
+/** Drops the verified roster from memory (sign-out, access revoked). Never falls back to demo data. */
+export function clearLiveRoster() {
+  live = null;
+  state = emptyState();
+  listeners.forEach((l) => l());
+}
+
+export const isLiveRoster = () => live !== null;
+
 function load(): PreviewState {
+  if (live) return (state ??= emptyState());
   if (state) return state;
   try {
     const raw = localStorage.getItem(KEY);
@@ -195,6 +233,7 @@ function load(): PreviewState {
 
 /** Re-reads persisted state if present (another tab may have written it). Keeps memory state otherwise. */
 function refresh() {
+  if (live) return;
   try {
     const raw = localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as PreviewState) : null;
@@ -203,6 +242,7 @@ function refresh() {
 }
 
 function persist() {
+  if (live) return; // live mode never writes to browser storage
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {}
@@ -217,7 +257,7 @@ function set(updater: (s: PreviewState) => PreviewState) {
 if (typeof window !== "undefined") {
   // Cross-tab sync: another tab starting or ending a patrol updates this one.
   window.addEventListener("storage", (e) => {
-    if (e.key !== KEY) return;
+    if (live || e.key !== KEY) return;
     state = null;
     load();
     listeners.forEach((l) => l());
@@ -245,6 +285,7 @@ export function getPreviewState(): PreviewState {
 }
 
 export function resetPreview() {
+  if (live) return;
   state = seed(Date.now());
   persist();
   listeners.forEach((l) => l());
@@ -253,6 +294,7 @@ export function resetPreview() {
 // ---------------------------------------------------------------- selectors
 
 export function memberById(id: string): Member | undefined {
+  if (live) return live.members.find((m) => m.id === id);
   const base = MEMBERS.find((m) => m.id === id);
   const o = state?.personnel?.[id];
   return base && o ? { ...base, ...o } : base;
@@ -260,6 +302,7 @@ export function memberById(id: string): Member | undefined {
 
 /** The roster with admin changes applied. */
 export function allMembers(): Member[] {
+  if (live) return live.members;
   return MEMBERS.map((m) => memberById(m.id)!);
 }
 
@@ -272,6 +315,7 @@ export function actorFor(member: Member): Actor {
 }
 
 export function currentMember(s: PreviewState): Member {
+  if (live) return live.me;
   return memberById(ROLE_PERSONA[s.role].memberId)!;
 }
 
@@ -290,6 +334,7 @@ const inFlight = new Set<string>();
 
 /** Serializes an operation: a second call while one is running is rejected (double-click guard). */
 async function guarded<T>(key: string, fn: () => T): Promise<T> {
+  if (live) throw new OperationError(LIVE_UNAVAILABLE);
   if (inFlight.has(key)) throw new OperationError("Already in progress");
   inFlight.add(key);
   try {
@@ -301,6 +346,7 @@ async function guarded<T>(key: string, fn: () => T): Promise<T> {
 }
 
 export function setRole(role: PreviewRole) {
+  if (live) return;
   set((s) => ({ ...s, role }));
 }
 

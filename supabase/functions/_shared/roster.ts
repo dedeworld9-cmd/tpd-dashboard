@@ -81,6 +81,7 @@ export interface Issue {
 const text = (c: Cell) => (c === null || c === undefined ? "" : String(c)).trim();
 const norm = (c: Cell) => text(c).toUpperCase().replace(/\s+/g, " ");
 const SNOWFLAKE = /^\d{17,20}$/;
+const CALLSIGN = /^X-\d{3}$/;
 
 /** Returns the index of the header row and a map of normalized label → column. */
 export function findHeader(rows: Rows, required: string[]): { index: number; cols: Record<string, number> } | null {
@@ -157,10 +158,16 @@ export function parseRoster(rows: Rows): { positions: ParsedPosition[]; issues: 
       continue;
     }
     const rank = asRank(position);
-    const callsign = col(row, "CALL SIGN") || null;
+    const rawCallsign = col(row, "CALL SIGN");
     const name = col(row, "NAME") || null;
     const discordId = col(row, "DISCORD USER ID") || null;
     const tz = col(row, "TIMEZONE");
+    // A placeholder such as "—" or "TBD" on a vacant slot is simply no call sign. On a filled slot a malformed call sign is an error:
+    // matching and call-sign uniqueness depend on it.
+    const validCallsign = CALLSIGN.test(rawCallsign);
+    const callsign = validCallsign ? rawCallsign : null;
+    if (rawCallsign && !validCallsign && (name || discordId))
+      issues.push({ severity: "error", code: "invalid_callsign", sheet: "TPD Roster", row: i + 1, message: `Row ${i + 1}: call sign "${rawCallsign}" is not in the X-### format.` });
     if (!rank) {
       issues.push({ severity: "error", code: "invalid_rank", sheet: "TPD Roster", row: i + 1, message: `Unknown rank "${position}"${callsign ? ` at ${callsign}` : ""}.` });
       continue;
@@ -300,6 +307,21 @@ export function buildSnapshot(roster: ReturnType<typeof parseRoster>, divisions:
       });
   }
 
+  // HB §9.3: at most three concurrent subdivisions. Reported, not blocked: the roster is the source of truth.
+  const perMember = new Map<string, number>();
+  for (const s of divisions.slots) if (s.discordId && byId.has(s.discordId)) perMember.set(s.discordId, (perMember.get(s.discordId) ?? 0) + 1);
+  for (const [id, n] of perMember)
+    if (n > 3) issues.push({ severity: "warning", code: "too_many_divisions", sheet: "TPD | Divisions", message: `${byId.get(id)!.callsign ?? "A member"} holds ${n} division slots; Handbook §9.3 allows three.` });
+
+  // Two different Discord IDs under one name usually means a typo in one of them.
+  const names = new Map<string, string[]>();
+  for (const p of byId.values()) if (p.name) names.set(p.name.toLowerCase(), [...(names.get(p.name.toLowerCase()) ?? []), p.callsign ?? `row ${p.row}`]);
+  for (const [n, at] of names) if (at.length > 1) issues.push({ severity: "warning", code: "duplicate_name", sheet: "TPD Roster", message: `The name "${n}" appears with different Discord IDs at ${at.join(", ")}.` });
+
+  // A sheet with positions but nobody signed up is an incomplete read, not a roster.
+  if (roster.positions.length && !byId.size)
+    issues.push({ severity: "error", code: "no_members", sheet: "TPD Roster", message: "No position has both a name and a valid Discord user ID; the read looks incomplete." });
+
   const members: SnapshotMember[] = [...byId.values()].map((p) => ({
     discordId: p.discordId!,
     name: p.name ?? p.callsign ?? "Unnamed",
@@ -377,6 +399,20 @@ export function removalGuard(currentActive: number, changes: Change[], confirmed
       message: `${removed} of ${currentActive} active members would be marked former. This looks like an incomplete read; a command user must confirm it manually.`,
     };
   return null;
+}
+
+/**
+ * Guard against a truncated sheet read: far fewer authorized positions than the last applied snapshot.
+ * Positions only change when leadership edits the structure, so a large drop is almost always a broken read.
+ */
+export function positionShrinkGuard(previous: number | null, next: number, confirmed: boolean): Issue | null {
+  if (!previous || confirmed || next >= previous * 0.8) return null;
+  return {
+    severity: "error",
+    code: "positions_shrunk",
+    sheet: "TPD Roster",
+    message: `${next} positions were read, down from ${previous} at the last import. This looks like an incomplete read; a command user must confirm it manually.`,
+  };
 }
 
 /** Stable hash input so unchanged sheets are recognized without re-applying. */

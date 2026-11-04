@@ -73,13 +73,24 @@ server-side check; signed-in users have no write grants on any table.
 Use `.env.example` for the variable list. Secrets go only into `supabase secrets set`; never into `NEXT_PUBLIC_*`, the repository or chat.
 
 ## Bootstrap note
-The first sync must be done by someone who is already Captain+ on the roster. That is impossible before the first import, so run the first sync once from the Supabase dashboard, by invoking `roster-sync` with the `x-sync-secret` header, or wait for the scheduler. After that, command users manage it from the site.
+The first sync must be done by someone who is already Captain+ on the roster. That is impossible before the first import, so the first import runs from the scheduler: set `ROSTER_SYNC_SECRET`, store the same value in Vault, run `supabase/sql/schedule-roster-sync.sql`, and the next 10-minute tick imports the roster (no custom HTTP header needed by hand). After that, command users manage it from the site.
+
+## Member access (Phase 1)
+- **Gate.** With a backend configured, no HQ page renders until sign-in, roster verification (`my_membership()`, matched on the exact Discord user ID from `auth.identities`) and the real directory load all succeed. Any failure closes HQ; there is never a fallback to demo personas. Signed-out visitors, unrecognized, former, inactive and unverifiable accounts see only the sign-in screen with the reason.
+- **Live mode.** Identity, the Personnel directory, Divisions and the Command Center staffing counts come from the database through RLS (`personnel_directory`, `division_slots`). The sample personas, sample sessions/requests and role switcher exist only in the no-backend design preview.
+- **Closed until built.** Patrol, Activity, Training, Requests and Supervisor have no server-side record, so in live mode they show "not connected yet" and every store mutation refuses to run. Nothing is saved to the browser.
+- **Authorization.** `can()` in the UI is convenience only. The server enforces it: `is_command()` (RLS) gates sync runs, audit, integration status and full personnel rows; `roster-sync` and `integration-health` call it before doing anything.
+- **Expired sessions.** A 401 or JWT error from the roster call ends the session locally and returns to sign-in; it is never shown as an outage.
+- **Roster import guards** (all reject the run, leaving the last valid snapshot): header/rank/Discord-ID/call-sign format errors, duplicate Discord ID or call sign, no member with a valid ID, a mass removal, and a position count that drops below 80% of the last import. A command user can confirm the last two manually. Warnings (not blocking): name without Discord ID, duplicate names under different IDs, more than three division slots for one member (HB §9.3), division holders missing from the roster.
+
+### If the first sign-in shows "Invalid JWT"
+Both `discord-verify` and `integration-health` validate the bearer token against Supabase Auth themselves before doing anything. If the gateway's own JWT check rejects real member tokens (possible with asymmetric JWT signing keys), turn **Verify JWT** off for those two functions in the dashboard. That does not weaken access: the in-function check stays.
 
 ## Tests
 - `npm test`: parser, validation, change detection, sync failure paths, Google JWT signing, Discord (member-token) and AnchorCAD adapters (mocked HTTP), and secret hygiene.
 - `supabase/tests/run-as-nonroot.sh` (or `run-local.sh` as a non-root user): applies the migration to a throwaway PostgreSQL with a stub auth schema and checks RLS, membership states and snapshot safety.
 - `deno check` on the three functions (`supabase/functions/deno.json`).
-- E2E: `tests/e2e/integrations.spec.ts`. The default build checks the "not configured" states. A build with a fake `NEXT_PUBLIC_SUPABASE_URL=https://fakeproj.supabase.co` and `E2E_FAKE_BACKEND=1` checks Discord PKCE redirect parameters and every membership state against stubbed responses.
+- E2E: `tests/e2e/integrations.spec.ts`. The default build checks the "not configured" states. A build with a fake `NEXT_PUBLIC_SUPABASE_URL=https://fakeproj.supabase.co` and `E2E_FAKE_BACKEND=1` checks Discord PKCE redirect parameters, every membership state, expired sessions, directory failure, demo isolation, closed workspaces and Command Center access against stubbed responses (`E2E_FAKE_BACKEND=1 E2E_BASE_URL=http://localhost:3411 npx playwright test tests/e2e/integrations.spec.ts` after `npx next build` with the fake env and `npx next start -p 3411`).
 
 None of these tests talks to the real Discord, Google, Supabase or AnchorCAD; those checks need the credentials above.
 
@@ -88,3 +99,9 @@ None of these tests talks to the real Discord, Google, Supabase or AnchorCAD; th
 - Functions deployed from the dashboard editor as single-file bundles: `npx esbuild supabase/functions/<name>/index.ts --bundle --format=esm --platform=neutral`. roster-sync has gateway JWT verification off (it checks a command JWT or `x-sync-secret` itself); the other two keep it on.
 - Secrets set: `DISCORD_GUILD_ID`, `ALLOWED_ORIGINS`, `GOOGLE_SHEETS_ID`. Missing: `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS`, `ROSTER_SYNC_SECRET`, AnchorCAD.
 - The site build uses the project's publishable key (public by design). Not deployed yet.
+
+## Pending on the live project (Phase 1 changes, not applied)
+1. Apply `supabase/migrations/20261105000000_roster_apply_hardening.sql` (SQL editor). Without it the first sync can fail on an unqualified `DELETE` and `my_membership` lacks the member id the new directory needs.
+2. Redeploy `discord-verify` (fix: command users were matched against the first personnel row instead of their own) and `roster-sync` (truncation guard).
+3. Missing secrets: `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS`, `ROSTER_SYNC_SECRET`. Then the scheduler SQL.
+4. Rebuild and deploy the site (needs approval).

@@ -4,7 +4,7 @@
  * Anything short of a clean, validated snapshot leaves the database untouched.
  */
 
-import { buildSnapshot, canonical, diffMembers, parseDivisions, parseRoster, removalGuard, type Change, type CurrentMember, type Issue, type Rows, type Snapshot } from "./roster.ts";
+import { buildSnapshot, canonical, diffMembers, parseDivisions, parseRoster, positionShrinkGuard, removalGuard, type Change, type CurrentMember, type Issue, type Rows, type Snapshot } from "./roster.ts";
 
 export type Mode = "preview" | "apply";
 export type RunStatus = "applied" | "no_changes" | "preview" | "rejected" | "failed";
@@ -13,6 +13,8 @@ export interface SyncDeps {
   readSheets(): Promise<{ roster: Rows; divisions: Rows }>;
   loadCurrent(): Promise<CurrentMember[]>;
   lastAppliedHash(): Promise<string | null>;
+  /** Position count of the last applied snapshot, or null before the first import. */
+  lastPositionCount(): Promise<number | null>;
   apply(snapshot: Snapshot): Promise<{ members: number; markedFormer: number }>;
   hash(s: string): Promise<string>;
 }
@@ -47,6 +49,14 @@ export async function runRosterSync(deps: SyncDeps, mode: Mode, opts: { confirmR
   const issues = [...built.issues];
   const guard = removalGuard(current.filter((m) => m.status === "active").length, changes, !!opts.confirmRemovals);
   if (guard) issues.push(guard);
+  let previousPositions: number | null;
+  try {
+    previousPositions = await deps.lastPositionCount();
+  } catch (e) {
+    return { status: "failed", hash: null, counts: empty, issues: built.issues, changes: [], error: (e as Error).message };
+  }
+  const shrink = positionShrinkGuard(previousPositions, built.snapshot.positions.length, !!opts.confirmRemovals);
+  if (shrink) issues.push(shrink);
 
   const hash = await deps.hash(canonical(built.snapshot));
   const counts = {

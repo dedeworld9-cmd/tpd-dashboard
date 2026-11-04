@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/feedback";
 import { can } from "@/lib/authz";
 import { formatMinutes, weekMinutes, formatTime } from "@/lib/domain/activity";
 import { useMe, useNow } from "@/lib/preview/hooks";
-import { getPreviewState, OperationError, patrol, usePreviewState, type PatrolDistrict, type SessionRecord } from "@/lib/preview/store";
+import { getPreviewState, isLiveRoster, OperationError, patrol, usePreviewState, type PatrolDistrict, type SessionRecord } from "@/lib/preview/store";
 
 /**
  * Patrol lifecycle shared by the dashboard, patrol console, sidebar and
@@ -102,7 +102,7 @@ export function PatrolProvider({ children }: { children: ReactNode }) {
   const week = state && me ? weekMinutes(state.sessions.filter((x) => x.memberId === me.member.id && x.end).map((x) => ({ start: x.start, end: x.end! })), new Date()) : 0;
 
   return (
-    <Ctx.Provider value={{ phase, canStart: me ? can(me.actor, "patrol.start") : false, start, requestEnd: () => setConfirmOpen(true) }}>
+    <Ctx.Provider value={{ phase, canStart: me && !isLiveRoster() ? can(me.actor, "patrol.start") : false, start, requestEnd: () => setConfirmOpen(true) }}>
       {children}
       <Dialog
         open={confirmOpen}

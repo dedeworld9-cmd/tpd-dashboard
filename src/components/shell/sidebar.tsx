@@ -26,7 +26,7 @@ import { Dot } from "@/components/ui/status";
 import { Skeleton, toast } from "@/components/ui/feedback";
 import { usePatrol } from "@/components/patrol/patrol-provider";
 import { can } from "@/lib/authz";
-import { useAuth } from "@/lib/backend/auth";
+import { useAuth, useIsLive } from "@/lib/backend/auth";
 import { cn } from "@/lib/cn";
 import { formatClock } from "@/lib/domain/activity";
 import { useMe, useNow } from "@/lib/preview/hooks";
@@ -166,6 +166,8 @@ function DutyStatus({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
   const { phase } = usePatrol();
   const onDuty = phase === "on-duty" || phase === "ending" || phase === "recovering";
   const now = useNow(1000, onDuty);
+  const live = useIsLive();
+  if (live) return null; // no patrol record exists server-side yet, so no duty state is shown
   if (!me) {
     return <div className="px-3 py-3">{collapsed ? <Skeleton className="mx-auto size-8 rounded-md opacity-20" /> : <Skeleton className="h-12 w-full opacity-20" />}</div>;
   }
@@ -311,6 +313,7 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
   const theme = useTheme();
   const { openShortcuts } = useShell();
   const auth = useAuth();
+  const live = useIsLive();
   if (!me) return <Skeleton className="h-11 w-full opacity-20" />;
   const roles = Object.keys(ROLE_PERSONA) as PreviewRole[];
 
@@ -358,8 +361,8 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
             </div>
           </div>
           <MenuSeparator />
-          <MenuLabel>Preview as (sample personas)</MenuLabel>
-          {roles.map((r) => (
+          {live ? null : <MenuLabel>Preview as (sample personas)</MenuLabel>}
+          {(live ? [] : roles).map((r) => (
             <MenuItem
               key={r}
               icon={<UserRound />}
@@ -407,16 +410,18 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
           >
             Keyboard shortcuts
           </MenuItem>
-          <MenuItem
-            icon={<RotateCcw />}
-            onSelect={() => {
-              resetPreview();
-              close();
-              toast("info", "Preview data reset", "Sample sessions and requests are back to their starting state.");
-            }}
-          >
-            Reset preview data
-          </MenuItem>
+          {live ? null : (
+            <MenuItem
+              icon={<RotateCcw />}
+              onSelect={() => {
+                resetPreview();
+                close();
+                toast("info", "Preview data reset", "Sample sessions and requests are back to their starting state.");
+              }}
+            >
+              Reset preview data
+            </MenuItem>
+          )}
           {auth.status === "disabled" ? (
             <MenuItem icon={<LogOut />} disabled hint="Not configured" onSelect={() => {}}>
               Discord sign-in

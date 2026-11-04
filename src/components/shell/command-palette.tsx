@@ -26,6 +26,7 @@ import { Kbd } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/tabs";
 import { can } from "@/lib/authz";
 import { cn } from "@/lib/cn";
+import { useIsLive } from "@/lib/backend/auth";
 import { useMe } from "@/lib/preview/hooks";
 import { allMembers, ROLE_PERSONA, setRole, usePreview, type PatrolDistrict, type PreviewRole } from "@/lib/preview/store";
 import { HANDBOOK_URL, USE_OF_FORCE_URL } from "@/lib/public-nav";
@@ -69,6 +70,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const list = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const me = useMe();
+  const live = useIsLive();
   const recentsState = usePreview((s) => s.recents);
   const patrolApi = usePatrol();
   const { openNewRequest, openShortcuts } = useShell();
@@ -144,12 +146,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     }
     out.push({ id: "pol-hb", group: "Policies", label: "Personnel Handbook", icon: BookOpen, keywords: "policy hb", external: true, run: () => (onClose(), window.open(HANDBOOK_URL, "_blank", "noopener")) });
     out.push({ id: "pol-uof", group: "Policies", label: "Use of Force Policy", icon: BookOpen, keywords: "policy uof", external: true, run: () => (onClose(), window.open(USE_OF_FORCE_URL, "_blank", "noopener")) });
-    for (const r of Object.keys(ROLE_PERSONA) as PreviewRole[]) {
+    for (const r of live ? [] : (Object.keys(ROLE_PERSONA) as PreviewRole[])) {
       if (r === me.role) continue;
       out.push({ id: `r-${r}`, group: "Preview", label: `Preview as ${ROLE_PERSONA[r].label}`, hint: ROLE_PERSONA[r].description, icon: UserRound, keywords: "role persona switch", run: () => (setRole(r), onClose()) });
     }
     return out;
-  }, [me, patrolApi, router, onClose, openNewRequest, openShortcuts]);
+  }, [me, live, patrolApi, router, onClose, openNewRequest, openShortcuts]);
 
   const results = useMemo(() => {
     const query = q.trim();

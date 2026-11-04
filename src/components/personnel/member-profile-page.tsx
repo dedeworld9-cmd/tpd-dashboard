@@ -17,7 +17,11 @@ export function MemberProfilePage({ id }: { id: string }) {
       <Link href="/hq/roster" className="mb-4 inline-flex items-center gap-1.5 text-2xs font-medium text-muted hover:text-ink">
         <ArrowLeft className="size-3.5" aria-hidden /> Personnel
       </Link>
-      {!state || !now || !member ? (
+      {state && now && !member ? (
+        <p role="status" className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">
+          This member is not on the roster.
+        </p>
+      ) : !state || !now || !member ? (
         <Skeleton className="h-96 rounded-lg" />
       ) : (
         <>

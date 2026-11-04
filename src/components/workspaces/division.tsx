@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/feedback";
 import { Pill } from "@/components/ui/status";
 import { Card, CardHeader } from "@/components/ui/surface";
 import { cn } from "@/lib/cn";
+import { useIsLive } from "@/lib/backend/auth";
 import { useMe } from "@/lib/preview/hooks";
 import { usePreviewState } from "@/lib/preview/store";
 import { DIVISIONS, divisionStaffing, positionByCallsign, VERIFIED_ON } from "@/lib/department";
@@ -16,6 +17,7 @@ import { DIVISIONS, divisionStaffing, positionByCallsign, VERIFIED_ON } from "@/
 export function DivisionWorkspace({ slug }: { slug: string }) {
   const me = useMe();
   const state = usePreviewState();
+  const live = useIsLive();
   const { openNewRequest } = useShell();
   const division = DIVISIONS.find((d) => d.slug === slug)!;
   if (!me || !state) {
@@ -33,7 +35,7 @@ export function DivisionWorkspace({ slug }: { slug: string }) {
   const atLimit = me.member.divisions.length >= 3;
   const full = staff.vacancies === 0;
   const pending = state.requests.some((r) => r.memberId === me.member.id && r.type === "Division application" && (r.state === "Submitted" || r.state === "Under review") && r.summary.includes(division.name));
-  const blocked = member ? "You’re a member" : pending ? "Application pending" : atLimit ? "You hold 3 subdivisions (Handbook §9.3)" : full ? "No vacancies" : null;
+  const blocked = live ? "Applications are not connected yet" : member ? "You’re a member" : pending ? "Application pending" : atLimit ? "You hold 3 subdivisions (Handbook §9.3)" : full ? "No vacancies" : null;
 
   return (
     <Page wide>

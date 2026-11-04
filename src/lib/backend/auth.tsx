@@ -72,8 +72,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data, error: e } = await sb.rpc("my_membership");
     if (e) {
-      setMembership({ state: "unavailable", reason: "request_failed" });
-      setError("The roster service could not be reached.");
+      // 401 / JWT errors mean the session is no longer valid (expired, revoked, user deleted): end it instead of showing a vague outage.
+      const { status, code } = e as { status?: number; code?: string };
+      if (status === 401 || code === "PGRST301" || code === "PGRST303" || /jwt/i.test(e.message ?? "")) {
+        await sb.auth.signOut({ scope: "local" }).catch(() => {});
+        setSession(null);
+        setMembership({ state: "signed_out" });
+        setError("Your session has ended. Sign in again.");
+      } else {
+        setMembership({ state: "unavailable", reason: "request_failed" });
+        setError("The roster service could not be reached.");
+      }
     } else {
       setMembership(parseMembership(data));
       setError(null);
@@ -154,6 +163,11 @@ export function useAuth(): AuthApi {
   const v = useContext(Ctx);
   if (!v) throw new Error("useAuth outside AuthProvider");
   return v;
+}
+
+/** True when a backend is configured: the HQ then shows only verified, server-backed identity and never demo personas. */
+export function useIsLive(): boolean {
+  return useAuth().status !== "disabled";
 }
 
 /** The verified member, or null in every other state (including the design preview). */

@@ -13,6 +13,7 @@ import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/men
 import { Dot } from "@/components/ui/status";
 import { cn } from "@/lib/cn";
 import { formatClock } from "@/lib/domain/activity";
+import { useIsLive } from "@/lib/backend/auth";
 import { useMe, useNow } from "@/lib/preview/hooks";
 import { markNotificationsRead, memberById, notificationsFor, usePreviewState } from "@/lib/preview/store";
 import { ANCHORCAD_URL, PAGES } from "./nav-config";
@@ -37,6 +38,7 @@ export function Topbar() {
   const pathname = usePathname();
   const { openPalette, openDrawer } = useShell();
   const paletteKey = usePaletteKey();
+  const live = useIsLive();
 
   const crumbs = useMemo(() => {
     const page = [...PAGES].sort((a, b) => b.href.length - a.href.length).find((p) => pathname === p.href || pathname.startsWith(`${p.href}/`));
@@ -83,10 +85,10 @@ export function Topbar() {
         </ol>
       </nav>
 
-      <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-amber-soft px-2.5 py-0.5 text-3xs font-semibold text-amber ring-1 ring-inset ring-amber/20 xl:inline-flex" title="Structure, divisions, fleet and policy are official. People, patrol sessions and requests are fictional demo data; nothing is saved to the department.">
+      {live ? null : <span className="ml-1 hidden items-center gap-1.5 rounded-full bg-amber-soft px-2.5 py-0.5 text-3xs font-semibold text-amber ring-1 ring-inset ring-amber/20 xl:inline-flex" title="Structure, divisions, fleet and policy are official. People, patrol sessions and requests are fictional demo data; nothing is saved to the department.">
         <FlaskConical aria-hidden className="size-3" />
         Design preview · demo personas
-      </span>
+      </span>}
 
       <div className="ml-auto flex items-center gap-1.5">
         <button
@@ -134,6 +136,7 @@ function QuickCreate() {
   const me = useMe();
   const { openNewRequest } = useShell();
   const patrolApi = usePatrol();
+  const live = useIsLive();
   const home = me?.member.district === "South" ? "South" : "North";
   const onDuty = patrolApi.phase === "on-duty";
   const go = (close: () => void, href: string) => (close(), router.push(href));
@@ -158,8 +161,8 @@ function QuickCreate() {
     >
       {(close) => (
         <>
-          <MenuLabel>Patrol</MenuLabel>
-          {onDuty ? (
+          {live ? null : <MenuLabel>Patrol</MenuLabel>}
+          {live ? null : onDuty ? (
             <MenuItem icon={<Square />} onSelect={() => (close(), patrolApi.requestEnd())}>
               End patrol…
             </MenuItem>
@@ -168,29 +171,36 @@ function QuickCreate() {
               Start patrol · {home}
             </MenuItem>
           ) : null}
-          <MenuItem icon={<Radio />} onSelect={() => go(close, "/hq/patrol")}>
-            Open patrol
-          </MenuItem>
+          {live ? null : (
+            <MenuItem icon={<Radio />} onSelect={() => go(close, "/hq/patrol")}>
+              Open patrol
+            </MenuItem>
+          )}
           {ANCHORCAD_URL ? (
             <MenuItem icon={<ExternalLink />} onSelect={() => (close(), window.open(ANCHORCAD_URL, "_blank", "noopener"))}>
               Open AnchorCAD
             </MenuItem>
           ) : null}
-          <MenuSeparator />
-          <MenuLabel>Create</MenuLabel>
-          {me && can(me.actor, "request.create") ? (
-            <MenuItem icon={<ClipboardPlus />} hint="N" onSelect={() => (close(), openNewRequest())}>
-              New request…
-            </MenuItem>
-          ) : null}
-          <MenuItem icon={<History />} onSelect={() => go(close, "/hq/patrol#history")}>
-            Activity correction…
-          </MenuItem>
-          <MenuSeparator />
+          {live ? null : (
+            <>
+              <MenuSeparator />
+              <MenuLabel>Create</MenuLabel>
+              {me && can(me.actor, "request.create") ? (
+                <MenuItem icon={<ClipboardPlus />} hint="N" onSelect={() => (close(), openNewRequest())}>
+                  New request…
+                </MenuItem>
+              ) : null}
+              <MenuItem icon={<History />} onSelect={() => go(close, "/hq/patrol#history")}>
+                Activity correction…
+              </MenuItem>
+            </>
+          )}
           <MenuLabel>Go to</MenuLabel>
-          <MenuItem icon={<GraduationCap />} onSelect={() => go(close, "/hq/training")}>
-            Training
-          </MenuItem>
+          {live ? null : (
+            <MenuItem icon={<GraduationCap />} onSelect={() => go(close, "/hq/training")}>
+              Training
+            </MenuItem>
+          )}
           {me && can(me.actor, "roster.view") ? (
             <MenuItem icon={<Users />} onSelect={() => go(close, "/hq/roster")}>
               Personnel
