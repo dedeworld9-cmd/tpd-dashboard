@@ -107,3 +107,8 @@ Not deployed: the live preview does not include Phase 2.
 - Real directory (Personnel), Overview and Command Center staffing come from RLS-protected views. Patrol, Activity, Training, Requests, Supervisor are closed ("not connected yet").
 - Fixes: `discord-verify` matched command users to the wrong personnel row; `apply_roster_snapshot` used unqualified DELETEs; expired sessions looked like outages. New: call-sign validation, no-member and position-shrink import guards, duplicate-name and >3-division warnings.
 - Needs a real member to verify: Discord sign-in end to end, the server-membership check, and gateway JWT acceptance. See docs/INTEGRATIONS.md, "Pending on the live project".
+
+### Phase 1 security pass (2026-11-04)
+- Shared project audited read-only: District Five authorization is membership/admin based (RLS plus SECURITY DEFINER RPCs, no table write grants for `anon`/`authenticated`), so a TPD login gets only a profile row. `tpd` grants are SELECT-only for `authenticated`, none for `anon`. Findings for dede (District Five side, not changed): email sign-ups are enabled and `handle_new_user` copies `provider_id` from user-editable metadata, so an email sign-up could claim a pre-seeded District Five roster slot; today there are 0 such slots and 0 email identities.
+- Roster removals: deferred until approved or seen in 3 independent snapshots (migration `20261105000100`). Approval is bound to the previewed snapshot hash.
+- Edge Functions: authenticate before parsing bodies, constant-time secret check, body size and shape limits, 81 HTTP-level negative tests. Live 405/401 probes recorded in the activation checklist.

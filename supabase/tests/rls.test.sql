@@ -99,21 +99,87 @@ select pg_temp.as_user(null);
 do $$ begin assert (tpd.my_membership() ->> 'state') = 'signed_out', 'signed out'; end $$;
 reset role;
 
--- 8. A member removed from the roster becomes former and loses access; callsign is freed.
+-- 8. Removal safeguards. A member missing from a snapshot stays active; they become former only after explicit
+--    approval, or after 3 separate applied snapshots at least 6 hours apart. Updates still apply meanwhile.
+create function pg_temp.snap(with3 boolean, with4 boolean) returns jsonb language sql as $f$
+  select jsonb_build_object(
+    'members', jsonb_build_array(
+      jsonb_build_object('discordId', '100000000000000001', 'name', 'A. Chief', 'callsign', 'X-101', 'rank', 'Chief of Police', 'appointment', 'Overall Operations', 'tier', 'Office of the Chiefs', 'district', null, 'timezone', 'EST'),
+      jsonb_build_object('discordId', '100000000000000002', 'name', 'B. Officer', 'callsign', 'X-426', 'rank', 'Corporal', 'appointment', 'Patrol Aide', 'tier', 'Patrol Bureau', 'district', 'South', 'timezone', 'PST'))
+    || case when with3 then jsonb_build_array(jsonb_build_object('discordId', '100000000000000003', 'name', 'C. Officer', 'callsign', 'X-430', 'rank', 'Officer', 'appointment', 'Patrol', 'tier', 'Patrol Bureau', 'district', 'North', 'timezone', 'EST')) else '[]'::jsonb end
+    || case when with4 then jsonb_build_array(jsonb_build_object('discordId', '100000000000000004', 'name', 'D. Officer', 'callsign', 'X-431', 'rank', 'Officer', 'appointment', 'Patrol', 'tier', 'Patrol Bureau', 'district', 'North', 'timezone', 'EST')) else '[]'::jsonb end,
+    'positions', jsonb_build_array(jsonb_build_object('ord', 1, 'callsign', 'X-101', 'rank', 'Chief of Police', 'appointment', 'Overall Operations', 'tier', 'Office of the Chiefs', 'district', null, 'discordId', '100000000000000001')))
+$f$;
 set role service_role;
-select tpd.apply_roster_snapshot($j${
-  "members": [
-    {"discordId": "100000000000000001", "name": "A. Chief", "callsign": "X-101", "rank": "Chief of Police", "appointment": "Overall Operations", "tier": "Office of the Chiefs", "district": null, "timezone": "EST"},
-    {"discordId": "100000000000000002", "name": "B. Officer", "callsign": "X-426", "rank": "Corporal", "appointment": "Patrol Aide", "tier": "Patrol Bureau", "district": "South", "timezone": "PST"}
-  ],
-  "positions": [{"ord": 1, "callsign": "X-101", "rank": "Chief of Police", "appointment": "Overall Operations", "tier": "Office of the Chiefs", "district": null, "discordId": "100000000000000001"}]
-}$j$::jsonb, '00000000-0000-0000-0000-0000000000f1');
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f1');
 reset role;
 do $$ begin
-  assert (select status from tpd.personnel where discord_id = '100000000000000003') = 'former', 'removed member former';
-  assert (select callsign from tpd.personnel where discord_id = '100000000000000003') is null, 'callsign freed';
-  assert (select rank || '/' || callsign || '/' || district from tpd.personnel where discord_id = '100000000000000002') = 'Corporal/X-426/South', 'rank, callsign, district change applied';
+  assert (select status from tpd.personnel where discord_id = '100000000000000003') = 'active', 'a missing member is NOT removed by one snapshot';
+  assert (select observations from tpd.removal_candidates where discord_id = '100000000000000003') = 1, 'missing member tracked as a candidate';
+  assert (select rank || '/' || callsign || '/' || district from tpd.personnel where discord_id = '100000000000000002') = 'Corporal/X-426/South', 'rank, callsign, district change applied meanwhile';
 end $$;
+-- A second snapshot straight away (inside the 6 hour gap) is not an independent observation.
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f2');
+reset role;
+do $$ begin assert (select observations from tpd.removal_candidates where discord_id = '100000000000000003') = 1, 'no double counting inside the gap'; end $$;
+-- Second independent observation.
+update tpd.removal_candidates set last_absent_at = now() - interval '7 hours';
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f3');
+reset role;
+do $$ begin assert (select observations from tpd.removal_candidates where discord_id = '100000000000000003') = 2, 'second observation counted'; end $$;
+-- Reappearing resets the streak.
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(true, false), '00000000-0000-0000-0000-0000000000f4');
+reset role;
+do $$ begin assert not exists (select 1 from tpd.removal_candidates), 'candidate cleared when the member is listed again'; end $$;
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f5');
+reset role;
+do $$ begin assert (select observations from tpd.removal_candidates where discord_id = '100000000000000003') = 1, 'streak restarted at 1'; end $$;
+-- Third consecutive independent observation marks the member former and frees the call sign.
+update tpd.removal_candidates set last_absent_at = now() - interval '7 hours';
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f6');
+reset role;
+update tpd.removal_candidates set last_absent_at = now() - interval '7 hours';
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f7');
+reset role;
+do $$ begin
+  assert (select status from tpd.personnel where discord_id = '100000000000000003') = 'former', 'removed after 3 independent snapshots';
+  assert (select callsign from tpd.personnel where discord_id = '100000000000000003') is null, 'callsign freed';
+  assert not exists (select 1 from tpd.removal_candidates), 'candidate record cleaned up';
+end $$;
+-- Explicit approval removes immediately, but only the approved member.
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, true), '00000000-0000-0000-0000-0000000000f8');
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000f9', array['100000000000000099']);
+reset role;
+do $$ begin assert (select status from tpd.personnel where discord_id = '100000000000000004') = 'active', 'approving someone else removes nobody'; end $$;
+set role service_role;
+select tpd.apply_roster_snapshot(pg_temp.snap(false, false), '00000000-0000-0000-0000-0000000000fa', array['100000000000000004']);
+reset role;
+do $$ begin
+  assert (select status from tpd.personnel where discord_id = '100000000000000004') = 'former', 'approved removal applied at once';
+  assert (select status from tpd.personnel where discord_id = '100000000000000001') = 'active', 'others untouched';
+end $$;
+-- The safeguard cannot be weakened from outside: min_observations below 2 is refused; signed-in users cannot call apply.
+set role service_role;
+do $$ begin
+  begin perform tpd.apply_roster_snapshot(pg_temp.snap(false, false), gen_random_uuid(), '{}', 1); raise exception 'weak setting accepted';
+  exception when raise_exception then if sqlerrm like '%accepted%' then raise; end if; end;
+end $$;
+reset role;
+set role authenticated;
+do $$ begin
+  begin perform tpd.apply_roster_snapshot(pg_temp.snap(false, false), gen_random_uuid()); raise exception 'apply allowed';
+  exception when insufficient_privilege then null; end;
+  assert (select count(*) from tpd.removal_candidates) = 0, 'no candidates visible to non-command (none exist or RLS)';
+end $$;
+reset role;
+delete from tpd.personnel where discord_id = '100000000000000004';
 
 -- 9. A malformed or empty snapshot is refused and nothing changes.
 set role service_role;

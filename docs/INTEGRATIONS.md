@@ -39,7 +39,7 @@ server-side check; signed-in users have no write grants on any table.
 - Finds the header row by its labels and maps columns by header text, so inserted rows or columns do not break it. Section headings set the tier. The POINTS column is never read; Hire Logs and Records are never read.
 - Validates: Discord ID format and uniqueness, call-sign uniqueness, known ranks, district, division holders on the roster, names without IDs (warning), empty or headerless reads.
 - Any error rejects the run and the previous snapshot stays. Removing more than max(3, 25%) of active members is treated as a broken read and needs a command user's explicit confirmation.
-- Apply is one transaction (`apply_roster_snapshot`). Members no longer listed become `former` (never deleted). Every run is logged in `roster_sync_runs` and `audit_log`.
+- Apply is one transaction (`apply_roster_snapshot`). Additions and ordinary updates (rank, call sign, district, appointment) apply at once. **A missing member is never marked `former` by a single read.** They stay active and are tracked in `removal_candidates` until either (a) a command user approves the removal after previewing the same snapshot (`confirmRemovals` plus the preview's `expectedHash`; a changed sheet invalidates the approval), or (b) they are absent from 3 separate applied snapshots, each at least 6 hours after the previous one. A member listed again loses their candidate record. Previews, rejected and failed runs never count. The scheduler can never approve removals. Members are never deleted. Every run is logged in `roster_sync_runs` and `audit_log`.
 - Direction is Sheets → website only. Nothing writes to Google.
 - Scheduled every 10 minutes once `supabase/sql/schedule-roster-sync.sql` is run; command users can preview and apply manually from Command Center → Integrations.
 
@@ -90,6 +90,9 @@ The project signs user tokens with an asymmetric key (ECC P-256; Project Setting
 - `roster-sync`: a command user's token the same way, or the `x-sync-secret` header.
 `supabase/config.toml` records this. Do not disable legacy API keys (`SUPABASE_ANON_KEY` is what the functions use to call Auth) until the functions are moved to the new keys.
 
+### Edge Function access checks
+Each function authenticates the caller itself (the gateway's JWT check is off, see above). Order of checks: method (non-POST is 405 and does nothing; OPTIONS is a CORS preflight), then identity, then authorization, then body parsing (malformed JSON 400, non-object 400, over 16 KB 413), then the work. `x-sync-secret` is compared by hash without early exit, an unset or empty secret never matches, and a secret never opens `integration-health` or `discord-verify`. Covered by `tests/unit/integrations/functions-http.test.ts` (missing, malformed, expired, anon-key, wrong-secret and non-command credentials; every rejected request is asserted to cause no service-role call).
+
 ## Tests
 - `npm test`: parser, validation, change detection, sync failure paths, Google JWT signing, Discord (member-token) and AnchorCAD adapters (mocked HTTP), and secret hygiene.
 - `supabase/tests/run-as-nonroot.sh` (or `run-local.sh` as a non-root user): applies the migration to a throwaway PostgreSQL with a stub auth schema and checks RLS, membership states and snapshot safety.
@@ -105,7 +108,7 @@ None of these tests talks to the real Discord, Google, Supabase or AnchorCAD; th
 - The site build uses the project's publishable key (public by design). Not deployed yet.
 
 ## Pending on the live project (Phase 1 changes, not applied)
-1. Apply `supabase/migrations/20261105000000_roster_apply_hardening.sql` (SQL editor). Without it the first sync can fail on an unqualified `DELETE` and `my_membership` lacks the member id the new directory needs.
-2. Redeploy `discord-verify` (fix: command users were matched against the first personnel row instead of their own; authenticates before anything else) and `roster-sync` (truncation guard; dry run with the sync secret). Turn Verify JWT OFF for `discord-verify` and `integration-health`.
+1. Apply, in this order, `supabase/migrations/20261105000000_roster_apply_hardening.sql` and then `supabase/migrations/20261105000100_roster_removal_safeguards.sql` (SQL editor; both safe to re-run; the second replaces the two-argument `apply_roster_snapshot` and adds `removal_candidates`). Without it the first sync can fail on an unqualified `DELETE` and `my_membership` lacks the member id the new directory needs.
+2. Redeploy `discord-verify`, `integration-health` (fix: command users were matched against the first personnel row instead of their own; authenticates before anything else) and `roster-sync` (truncation guard; dry run with the sync secret). Deploy the new code BEFORE turning Verify JWT OFF for `discord-verify` and `integration-health`: the new code authenticates first, the old `discord-verify` did not.
 3. Missing secrets: `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS`, `ROSTER_SYNC_SECRET`. Then the scheduler SQL.
 4. Rebuild and deploy the site (needs approval).

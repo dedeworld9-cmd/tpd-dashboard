@@ -56,6 +56,8 @@ interface SyncResponse {
   issues: { severity: string; code: string; message: string }[];
   changes: { kind: string; name: string; callsign?: string | null; rank?: string; fields?: Record<string, { from: unknown; to: unknown }> }[];
   error: string | null;
+  hash?: string | null;
+  outcome?: { markedFormer: number; pendingRemoval: number } | null;
 }
 
 const when = (s: string | null | undefined) => (s ? new Date(s).toLocaleString() : "Never");
@@ -329,7 +331,7 @@ function Live() {
               loading={busy === "apply"}
               onClick={() =>
                 run("apply", async () => {
-                  const r = await auth.invoke<SyncResponse>("roster-sync", { mode: "apply", confirmRemovals });
+                  const r = await auth.invoke<SyncResponse>("roster-sync", { mode: "apply", confirmRemovals, expectedHash: preview?.hash ?? null });
                   setPreview(null);
                   setConfirmRemovals(false);
                   if (r.status !== "applied" && r.status !== "no_changes")
@@ -351,10 +353,15 @@ function Live() {
             {preview.issues.map((i, n) => (
               <Callout key={n} tone={i.severity === "error" ? "error" : "warn"} title={i.message} />
             ))}
-            {preview.issues.some((i) => i.code === "mass_removal") ? (
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={confirmRemovals} onChange={(e) => setConfirmRemovals(e.target.checked)} /> I checked the sheet; these members really left.
-              </label>
+            {preview.changes.some((c) => c.kind === "removed") ? (
+              <div className="flex flex-col gap-1">
+                <p className="text-muted">
+                  Members no longer on the sheet stay active unless you approve their removal here. Otherwise they are removed only after the sheet omits them in three separate checks, at least six hours apart.
+                </p>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={confirmRemovals} onChange={(e) => setConfirmRemovals(e.target.checked)} /> I checked the sheet; remove the members listed as “removed” now.
+                </label>
+              </div>
             ) : null}
             <ul className="max-h-64 divide-y divide-line overflow-auto rounded-lg border border-line">
               {preview.changes.length ? (

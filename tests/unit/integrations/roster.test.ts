@@ -204,19 +204,21 @@ describe("sync mode", () => {
 describe("sync orchestration", () => {
   const deps = (over: Partial<SyncDeps> = {}) => {
     const applied: unknown[] = [];
+    const approvals: string[][] = [];
     const d: SyncDeps = {
       readSheets: async () => ({ roster: rosterRows(), divisions: divisionRows() }),
       loadCurrent: async () => [],
       lastAppliedHash: async () => null,
       lastPositionCount: async () => null,
-      apply: async (s) => {
+      apply: async (s, approved) => {
         applied.push(s);
-        return { members: s.members.length, markedFormer: 0 };
+        approvals.push(approved);
+        return { members: s.members.length, markedFormer: approved.length, pendingRemoval: 0 };
       },
       hash: async (s) => String(s.length),
       ...over,
     };
-    return { d, applied };
+    return { d, applied, approvals };
   };
 
   it("initial import applies all members", async () => {
@@ -265,7 +267,57 @@ describe("sync orchestration", () => {
     expect(r.status).toBe("rejected");
     expect(r.issues.map((i) => i.code)).toContain("positions_shrunk");
     expect(applied).toHaveLength(0);
-    expect((await runRosterSync(d, "apply", { confirmRemovals: true })).status).toBe("applied");
+    const preview = await runRosterSync(d, "preview");
+    expect((await runRosterSync(d, "apply", { confirmRemovals: true, expectedHash: preview.hash })).status).toBe("applied");
+  });
+
+  describe("removal approval", () => {
+    const fewer = () => ({ readSheets: async () => ({ roster: rosterRows().slice(0, 12), divisions: divisionRows() }), loadCurrent: async () => current() });
+    const stubbornDeps = () => deps({ ...fewer(), lastPositionCount: async () => null });
+
+    it("approval is refused without the hash of a reviewed preview", async () => {
+      const { d, applied } = stubbornDeps();
+      const r = await runRosterSync(d, "apply", { confirmRemovals: true });
+      expect(r.status).toBe("rejected");
+      expect(r.issues.map((i) => i.code)).toContain("approval_stale");
+      expect(applied).toHaveLength(0);
+    });
+
+    it("approval is refused when the sheet changed after the preview", async () => {
+      const { d, applied } = stubbornDeps();
+      const r = await runRosterSync(d, "apply", { confirmRemovals: true, expectedHash: "not-the-previewed-hash" });
+      expect(r.status).toBe("rejected");
+      expect(r.issues.map((i) => i.code)).toContain("approval_stale");
+      expect(applied).toHaveLength(0);
+    });
+
+    it("an approved run passes exactly the removed Discord IDs to the database; an unapproved one passes none", async () => {
+      const { d, approvals } = stubbornDeps();
+      const preview = await runRosterSync(d, "preview");
+      const removed = preview.changes.filter((c) => c.kind === "removed").map((c) => c.discordId);
+      expect(removed.length).toBeGreaterThan(0);
+      expect((await runRosterSync(d, "apply", { confirmRemovals: true, expectedHash: preview.hash })).status).toBe("applied");
+      expect(approvals[0].sort()).toEqual(removed.sort());
+
+      // A small, ordinary removal (below the mass-removal limit) applies without approval, but removes nobody at once.
+      const small = deps({ loadCurrent: async () => [...current(), { discordId: id(99), name: "Gone", callsign: null, rank: "Officer", appointment: "x", district: null, status: "active" }] });
+      const r = await runRosterSync(small.d, "apply");
+      expect(r.status).toBe("applied");
+      expect(small.approvals[0]).toEqual([]);
+    });
+
+    it("the scheduler path cannot approve removals, whatever the request says", async () => {
+      // The edge function derives confirmRemovals from !scheduled; a scheduled run reaches runRosterSync with it false.
+      const { d, applied } = stubbornDeps();
+      const r = await runRosterSync(d, "apply", { confirmRemovals: false, expectedHash: "anything" });
+      expect(r.status).toBe("rejected");
+      expect(applied).toHaveLength(0);
+    });
+
+    it("reports what the database did with missing members", async () => {
+      const { d } = deps({ apply: async () => ({ members: 7, markedFormer: 0, pendingRemoval: 2 }) });
+      expect((await runRosterSync(d, "apply")).outcome).toEqual({ markedFormer: 0, pendingRemoval: 2 });
+    });
   });
 
   it("a failure reading prior state fails the run without applying", async () => {

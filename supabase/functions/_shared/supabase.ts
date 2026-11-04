@@ -71,6 +71,34 @@ export function client(env: Env) {
 
 export const bearer = (req: Request) => req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
 
+/** Compares two secrets without leaking where they differ: both are hashed to a fixed length first. */
+export async function secretsMatch(provided: string | null | undefined, expected: string | null | undefined): Promise<boolean> {
+  if (!provided || !expected) return false;
+  const [a, b] = await Promise.all([sha256(provided), sha256(expected)]);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export const MAX_BODY_BYTES = 16_384;
+
+/** Reads a small JSON object body. Empty body = {}. Oversized, non-JSON or non-object bodies are refused instead of ignored. */
+export async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) throw new HttpError(413, "Request body too large");
+  const text = await req.text();
+  if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) throw new HttpError(413, "Request body too large");
+  if (!text.trim()) return {};
+  let v: unknown;
+  try {
+    v = JSON.parse(text);
+  } catch {
+    throw new HttpError(400, "Request body must be valid JSON");
+  }
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new HttpError(400, "Request body must be a JSON object");
+  return v as Record<string, unknown>;
+}
+
 export function cors(env: Env, req: Request): Record<string, string> {
   const allowed = (env.get("ALLOWED_ORIGINS") ?? "")
     .split(",")
