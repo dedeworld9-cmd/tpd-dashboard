@@ -10,6 +10,7 @@ import { Card, CardHeader } from "@/components/ui/surface";
 import { useVerifiedMember } from "@/lib/backend/auth";
 import { patrolEnd, patrolHistory, patrolStart, type RecordedPatrol } from "@/lib/backend/patrol";
 import { formatClock, formatMinutes, weekMinutes } from "@/lib/domain/activity";
+import { requestCorrection } from "@/lib/backend/patrol-corrections";
 
 const fmt = (value: string) => new Date(value).toLocaleString();
 function elapsedSeconds(s: RecordedPatrol, now: number): number {
@@ -143,7 +144,67 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
           </Card>
         </div>
         {loading ? <p role="status" className="text-sm text-muted">Loading official patrol sessions…</p> : <RecordedHistory sessions={sessions} />}
+        {!loading && <PatrolCorrectionForm sessions={sessions} />}
       </div>
     </Page>
   );
+}
+
+function PatrolCorrectionForm({ sessions }: { sessions: RecordedPatrol[] }) {
+ const completed=sessions.filter(s=>s.ended_at!==null);
+ const [id,setId]=useState("");
+ const [start,setStart]=useState("");
+ const [end,setEnd]=useState("");
+ const [reason,setReason]=useState("");
+ const [busy,setBusy]=useState(false);
+ const [message,setMessage]=useState("");
+ const [error,setError]=useState("");
+ const toLocal=(value:string)=> {
+  const d=new Date(value);const offset=d.getTimezoneOffset()*60000;
+  return new Date(d.getTime()-offset).toISOString().slice(0,16);
+ };
+ function choose(nextId:string){
+  setId(nextId);setMessage("");setError("");
+  const s=completed.find(x=>x.id===nextId);
+  setStart(s?toLocal(s.started_at):"");
+  setEnd(s?.ended_at?toLocal(s.ended_at):"");
+ }
+ async function submit(){
+  if(busy || !id)return;
+  setBusy(true);setError("");setMessage("");
+  try{
+   await requestCorrection(id,start,end,reason);
+   setMessage("Correction request submitted for supervisor review. Your original patrol record is unchanged.");
+   setReason("");
+  }catch(e){setError(e instanceof Error?e.message:"Could not submit correction.");}
+  finally{setBusy(false);}
+ }
+ return <Card>
+  <CardHeader title="Request a patrol correction" description="Mistimed sessions are never edited directly. A supervisor reviews your proposed times and explanation."/>
+  <div className="space-y-3 border-t border-line p-4 text-xs">
+   {completed.length===0?<p className="text-muted">Complete a patrol before requesting a correction.</p>:<>
+    {error&&<Callout tone="error" title="Correction failed">{error}</Callout>}
+    {message&&<p role="status" className="font-semibold text-green">{message}</p>}
+    <label className="block font-semibold" htmlFor="correction-session">Completed session</label>
+    <select id="correction-session" value={id} onChange={e=>choose(e.target.value)} className="w-full rounded-md border border-line bg-surface px-3 py-2 text-ink">
+     <option value="">Select a session</option>
+     {completed.map(s=><option key={s.id} value={s.id}>{s.district} · {new Date(s.started_at).toLocaleString()}</option>)}
+    </select>
+    {id&&<>
+     <div className="grid gap-3 sm:grid-cols-2">
+      <label className="block">Proposed start
+       <input type="datetime-local" className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink" value={start} onChange={e=>setStart(e.target.value)}/>
+      </label>
+      <label className="block">Proposed end
+       <input type="datetime-local" className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink" value={end} onChange={e=>setEnd(e.target.value)}/>
+      </label>
+     </div>
+     <label className="block">Reason (at least 15 characters)
+      <textarea value={reason} maxLength={2000} rows={3} onChange={e=>setReason(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink" placeholder="Explain exactly why this session needs correction."/>
+     </label>
+     <Button variant="gold" size="sm" loading={busy} disabled={busy||reason.trim().length<15||!start||!end} onClick={()=>void submit()}>Submit for review</Button>
+    </>}
+   </>}
+  </div>
+ </Card>;
 }
