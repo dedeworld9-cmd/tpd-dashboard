@@ -2,7 +2,7 @@ name: Phase 2 patrol development checks
 
 on:
   push:
-    branches: [main, phase2-persistent-patrol, phase3-patrol-review, phase4-member-requests, phase5-training-records, phase6-clearance-personnel, phase7-command-reporting, phase8-release-hardening]
+    branches: [main, phase2-persistent-patrol, phase3-patrol-review, phase4-member-requests, phase5-training-records, phase6-clearance-personnel, phase7-command-reporting, phase8-release-hardening, feature-public-civilian-ridealongs]
   workflow_dispatch:
 
 permissions:
