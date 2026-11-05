@@ -10,7 +10,7 @@ import { Card, CardHeader } from "@/components/ui/surface";
 import { useVerifiedMember } from "@/lib/backend/auth";
 import { patrolEnd, patrolHistory, patrolStart, type RecordedPatrol } from "@/lib/backend/patrol";
 import { formatClock, formatMinutes, weekMinutes } from "@/lib/domain/activity";
-import { requestCorrection, listCorrections, type Correction } from "@/lib/backend/patrol-corrections";
+import { requestCorrection, listMyCorrections, type Correction } from "@/lib/backend/patrol-corrections";
 
 const fmt = (value: string) => new Date(value).toLocaleString();
 function elapsedSeconds(s: RecordedPatrol, now: number): number {
@@ -52,11 +52,13 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
   const [now, setNow] = useState(() => Date.now());
   const inFlight = useRef(false);
 
+  const memberId = me?.id;
   const reload = useCallback(async () => {
+    if (!memberId) return;
     setLoading(true);
     setError("");
     try {
-      const [patrols, correctionRows] = await Promise.all([patrolHistory(), listCorrections()]);
+      const [patrols, correctionRows] = await Promise.all([patrolHistory(), listMyCorrections(memberId)]);
       setSessions(patrols);
       setCorrections(correctionRows);
     } catch (e) {
@@ -64,7 +66,7 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [memberId]);
 
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => {
@@ -80,6 +82,7 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
   const completedApproved = sessions.filter((s) => s.ended_at !== null)
     .flatMap((s) => {
       const c = latestCorrections.get(s.id);
+      if (corrections.some(change => change.session_id === s.id && change.status === "pending")) return [];
       if (s.review_required && !c) return [];
       return [{ start: new Date(c?.proposed_started_at ?? s.started_at).getTime(),
                 end: new Date(c?.proposed_ended_at ?? s.ended_at!).getTime() }];
@@ -116,7 +119,7 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
       <div className="space-y-5">
         {error && <Callout tone="error" title="Patrol backend error">{error} Your session was not modified locally. Use Refresh to verify server state.</Callout>}
         <Callout tone="info" title="Recorded hours are not automatically approved">
-          The 3-hour weekly requirement is Handbook §3.2. The provisional total includes completed, unflagged sessions and the latest approved correction for each session. Pending and denied corrections do not replace original timestamps. This is not yet a formal compliance approval.
+          The 3-hour weekly requirement is Handbook §3.2. The provisional total includes completed, unflagged sessions and the latest approved correction for each session. Pending corrections are excluded until reviewed; denied corrections leave original timestamps intact. This is not yet a formal compliance approval.
         </Callout>
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <section className="rounded-xl border border-dark-line bg-obsidian p-5 text-on-dark sm:p-7">
