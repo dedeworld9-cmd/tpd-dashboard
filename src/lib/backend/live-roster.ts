@@ -4,7 +4,7 @@ import type { LiveRoster } from "@/lib/preview/store";
 import type { Member } from "@/lib/sample-data";
 import type { VerifiedMember } from "./membership";
 
-/** Row shape of tpd.personnel_directory: no Discord IDs, no timezones. */
+/** Row shape of tpd.list_member_directory RPC: no Discord IDs, no timezones. */
 export interface DirectoryRow {
   id: string;
   name: string;
@@ -72,12 +72,13 @@ export function buildLiveRoster(me: VerifiedMember, directory: DirectoryRow[], s
 
 interface Sb {
   from(table: string): { select(cols: string): PromiseLike<{ data: unknown[] | null; error: unknown }> };
+  rpc(functionName: string): PromiseLike<{ data: unknown[] | null; error: unknown }>;
 }
 
-/** Reads the directory with the member's own session; RLS decides what comes back. Throws on any failure: there is no demo fallback. */
+/** Reads only display-safe directory fields using the authenticated member RPC. Throws on any failure: there is no demo fallback. */
 export async function loadLiveRoster(sb: Sb, me: VerifiedMember): Promise<LiveRoster> {
   const [dir, slots] = await Promise.all([
-    sb.from("personnel_directory").select("id,name,callsign,rank,appointment,tier,district,status"),
+    sb.rpc("list_member_directory"),
     sb.from("division_slots").select("personnel_id,division_slug"),
   ]);
   if (dir.error || slots.error || !dir.data || !slots.data) throw new Error("The roster directory could not be loaded.");

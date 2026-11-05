@@ -1,0 +1,33 @@
+name: Phase 8 security and browser QA
+on:
+  push:
+    branches: [phase8-release-hardening]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Audit production npm dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Install Chromium (desktop/mobile emulation)
+        run: npx playwright install --with-deps chromium
+      - name: Run existing desktop and mobile browser suite
+        run: npm run test:e2e
+        env:
+          CI: '1'
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase8-playwright-traces
+          path: test-results
+          if-no-files-found: ignore

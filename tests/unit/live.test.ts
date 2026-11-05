@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { notConnectedArea } from "@/components/auth/live-gate";
-import { buildLiveRoster, type DirectoryRow } from "@/lib/backend/live-roster";
+import { buildLiveRoster, loadLiveRoster, type DirectoryRow } from "@/lib/backend/live-roster";
 import { parseMembership, actorFor, type VerifiedMember } from "@/lib/backend/membership";
 import { can } from "@/lib/authz";
 import {
@@ -144,5 +144,31 @@ describe("workspaces with no server record", () => {
     for (const p of ["/hq/training", "/hq/training/"]) expect(notConnectedArea(p)).toBeNull();
     for (const p of ["/hq/patrol", "/hq/patrol/", "/hq/activity", "/hq/activity/", "/hq/supervisor", "/hq/requests", "/hq/requests/"]) expect(notConnectedArea(p)).toBeNull();
     for (const p of ["/hq", "/hq/roster", "/hq/structure", "/hq/divisions/swat", "/hq/resources", "/hq/command", "/hq/command/integrations", "/hq/settings"]) expect(notConnectedArea(p)).toBeNull();
+  });
+});
+
+
+describe("Phase 8 safe directory cutover", () => {
+  it("loads only the safe RPC and division-slot rows; never queries the privileged directory view", async () => {
+    const rpc = vi.fn(async (name: string) => {
+      expect(name).toBe("list_member_directory");
+      return { data: directory, error: null };
+    });
+    const from = vi.fn((table: string) => {
+      expect(table).toBe("division_slots");
+      return { select: vi.fn(async () => ({ data: [], error: null })) };
+    });
+    const result = await loadLiveRoster({ rpc, from }, me());
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(from).toHaveBeenCalledOnce();
+    expect(result.members.map(m => m.name).sort()).toEqual(["Real Captain", "Real Member"]);
+  });
+
+  it("fails closed on directory authorization errors", async () => {
+    const sb = {
+      rpc: vi.fn(async () => ({ data: null, error: { message: "Access denied" } })),
+      from: vi.fn(() => ({ select: vi.fn(async () => ({ data: [], error: null })) })),
+    };
+    await expect(loadLiveRoster(sb, me())).rejects.toThrow(/directory could not be loaded/);
   });
 });
