@@ -1,0 +1,36 @@
+name: Phase 8 one-time dependency security upgrade
+on:
+  push:
+    branches: [phase8-release-hardening]
+    paths: ['.github/workflows/phase8-upgrade-deps.yml']
+permissions:
+  contents: write
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase8-release-hardening
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install patched compatible Next.js and ESLint config
+        run: npm install next@15.5.29 eslint-config-next@15.5.29 --save-exact
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Commit exactly the dependency changes to development branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "security: pin patched Next.js 15.5.29 and matching ESLint configuration"
+          git push origin HEAD:phase8-release-hardening
