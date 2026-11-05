@@ -1,0 +1,58 @@
+name: Publish TPD HQ Phase 1
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-phase1.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tpd-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out approved Phase 1 build
+        uses: actions/checkout@v4
+        with:
+          ref: c8a4a47c1e29f2e9ae87d715c6deb9040f73b65a
+          persist-credentials: false
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Verify
+        run: |
+          npm run typecheck
+          npm run lint
+          npm run test
+      - name: Export production website
+        env:
+          STATIC_EXPORT: '1'
+          PAGES_BASE_PATH: /tpd-dashboard
+          NEXT_PUBLIC_SUPABASE_URL: https://ajequjidyrsitqmcqkwr.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_E-u-OZaCNA6i3GACXBfueA_tQmIGs46
+        run: npm run build
+      - name: Publish static export to gh-pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -f out/index.html
+          cd out
+          touch .nojekyll
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Publish approved TPD Headquarters Phase 1"
+          header=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
+          git -c "http.extraheader=AUTHORIZATION: basic $header" push --force "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages
