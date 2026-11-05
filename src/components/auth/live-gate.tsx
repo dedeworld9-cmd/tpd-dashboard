@@ -15,8 +15,6 @@ import { clearLiveRoster, setLiveRoster } from "@/lib/preview/store";
 
 /** Routes that have no server-side record yet. They stay closed in live mode instead of saving into the browser. */
 const NOT_CONNECTED: { prefix: string; label: string }[] = [
-  { prefix: "/hq/patrol", label: "Patrol" },
-  { prefix: "/hq/activity", label: "Activity" },
   { prefix: "/hq/training", label: "Training" },
   { prefix: "/hq/requests", label: "Requests" },
   { prefix: "/hq/supervisor", label: "Supervisor desk" },
