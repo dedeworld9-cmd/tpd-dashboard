@@ -7,6 +7,7 @@ import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { CORE_VALUES, DISTRICTS, DIVISIONS, POSITIONS, SOURCES, TIERS, TRAINING_PATHWAY, VERIFIED_ON, byTier, divisionStaffing, positionByCallsign, staffing } from "@/lib/department";
 import { APPLICATION_URL } from "@/lib/public-nav";
+import { RideAlongSpotlight } from "@/components/public/ride-along-spotlight";
 
 /** HB §3.1: applying, then the seven steps to independent patrol. */
 const PATHWAY = [{ title: "Apply", detail: "Complete the recruitment application. Successful applicants are appointed Probationary Patrol Officers." }, ...TRAINING_PATHWAY];
@@ -47,6 +48,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <RideAlongSpotlight />
 
       {/* Values strip */}
       <section id="about" aria-labelledby="values-h" className="scroll-mt-20 border-b border-line bg-surface">
@@ -245,7 +248,7 @@ export default function HomePage() {
           </h2>
           <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
             <Service icon={UserPlus} title="Join the department" body="Apply through the recruitment application. Every submission is reviewed by the recruitment team." cta={{ href: APPLICATION_URL, label: "Apply", external: true }} />
-            <Service icon={Car} title="Ride-along program" body="Civilians request a ride-along with an available TPD officer. The officer’s Sergeant or above approves it before it begins (Handbook §12.1)." />
+            <Service icon={Car} title="Ride-along program" body="Make a copy of the civilian application, open a ticket in TPD Discord, and await a supervisory decision (Handbook §12.1)." cta={{ href: "/ride-alongs", label: "How to apply" }} />
             <Service icon={Megaphone} title="Public communications" body="Official announcements and press releases come only from the Office of Public Affairs (Handbook §14.1)." />
           </ul>
         </div>
