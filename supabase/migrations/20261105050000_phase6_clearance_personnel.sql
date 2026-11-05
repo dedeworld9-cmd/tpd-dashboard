@@ -196,3 +196,15 @@ revoke all on function tpd.review_personnel_change(uuid,boolean,text) from publi
 grant execute on function tpd.review_personnel_change(uuid,boolean,text) to authenticated;
 -- Approved proposals are instructions for manual Google Sheets reconciliation,
 -- NOT database updates. The roster sync remains the only roster writer.
+
+-- A narrow self-check lets the Patrol UI honor OOTC clearance without
+-- revealing or trusting other members' training data.
+create or replace function tpd.my_independent_clearance()
+returns boolean language sql stable security definer set search_path='' as $$
+ select coalesce((
+  select tpd.has_independent_clearance(p.id) from tpd.personnel p
+  where p.discord_id=tpd.current_discord_id() and p.status='active'
+ ),false) and auth.uid() is not null
+$$;
+revoke all on function tpd.my_independent_clearance() from public,anon;
+grant execute on function tpd.my_independent_clearance() to authenticated;
