@@ -13,7 +13,7 @@ import { formatClock, formatMinutes, weekMinutes } from "@/lib/domain/activity";
 
 const fmt = (value: string) => new Date(value).toLocaleString();
 function elapsedSeconds(s: RecordedPatrol, now: number): number {
-  return Math.max(0, (new Date(s.ended_at ?? now).getTime() - new Date(s.started_at).getTime()) / 1000);
+  return Math.max(0, (new Date(s.ended_at ?? new Date(now).toISOString()).getTime() - new Date(s.started_at).getTime()) / 1000);
 }
 
 function RecordedHistory({ sessions }: { sessions: RecordedPatrol[] }) {
