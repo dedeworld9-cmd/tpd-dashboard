@@ -47,6 +47,7 @@ export function LiveOverview() {
                 ["/hq/structure", "Department structure"],
                 ["/hq/divisions", "Divisions"],
                 ["/hq/resources", "Resources, fleet and policy"],
+                ["/hq/command/personnel", "Personnel change proposals (Command)"],
               ].map(([href, label]) => (
                 <li key={href}>
                   <Link href={href} className="flex items-center justify-between px-4 py-2.5 font-medium hover:bg-surface-2">
@@ -177,7 +178,7 @@ export function LiveCommand() {
       <PageHeader
         eyebrow="Command"
         title="Command Center"
-        description="Roster-derived staffing. Patrol compliance and the decision queue arrive with their server-side records."
+        description="Roster-derived staffing, authorized personnel change proposals, and server-backed operational workflows."
         actions={
           <ButtonLink href="/hq/command/integrations" variant="secondary">
             Integrations
@@ -190,9 +191,10 @@ export function LiveCommand() {
         <Stat label="North District" value={members.filter((m) => m.district === "North").length} sub="members" />
         <Stat label="South District" value={members.filter((m) => m.district === "South").length} sub="members" />
       </div>
-      <Callout tone="info" title="Compliance and decisions are not connected yet">
-        Weekly patrol compliance and request decisions need server-side patrol and request records. Nothing is estimated or shown from sample data.
+      <Callout tone="info" title="Operational records are connected">
+        Patrol, review, request and training workflows are stored in Supabase. Personnel changes must be reconciled through the official Google Sheets roster; compliance outcomes are not automatically assigned.
       </Callout>
+      <div className="mt-3"><ButtonLink href="/hq/command/personnel" variant="secondary">Personnel change proposals</ButtonLink></div>
     </Page>
   );
 }

@@ -10,6 +10,7 @@ import { useVerifiedMember } from "@/lib/backend/auth";
 import { TRAINING_PATHWAY, type TrainingStepKey } from "@/lib/department";
 import { allMembers } from "@/lib/preview/store";
 import { listTrainingSignoffs, signOffTrainingModule, type TrainingSignoff } from "@/lib/backend/training";
+import { LiveClearancePanel } from "@/components/workspaces/live-clearance-panel";
 
 type ModuleKey=Exclude<TrainingStepKey,"approval">;
 const MODULES=TRAINING_PATHWAY.filter((m):m is Extract<typeof TRAINING_PATHWAY[number],{key:ModuleKey}>=>m.key!=="approval");
@@ -80,6 +81,7 @@ export function LiveTraining(){
       })}
      </ol>}
    </Card>
+   <LiveClearancePanel signoffs={items}/>
    {isOotc&&<Card>
     <CardHeader title="Office of the Chiefs · Module sign-offs"
      description="Confirm training evidence for an active probationary officer. Only OOTC can sign off modules until the PTO authority policy is resolved (PC-06)." />
