@@ -25,6 +25,7 @@ jobs:
           npm pkg set "overrides.next.postcss=8.5.23"
           npm audit fix --omit=dev || true
           npm install --package-lock-only
+          npm ci
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
