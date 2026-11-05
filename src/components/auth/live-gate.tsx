@@ -121,7 +121,7 @@ export function NotConnected({ area }: { area: string }) {
     <Page>
       <PageHeader eyebrow="Headquarters" title={`${area} is not connected yet`} description="This workspace needs a server-side record that has not been built, so it is closed instead of saving into your browser." />
       <Callout tone="info" title="Nothing here is recorded or counted yet">
-        Patrol time, requests, training progress and activity totals are not stored anywhere official, so none are shown. Your verified identity, the personnel directory, department structure, divisions and resources are live.
+        Patrol sessions and recorded activity are stored server-side. Requests and training progress remain unavailable until their own records are implemented. Your verified identity, personnel directory, department structure, divisions and resources are live.
       </Callout>
       <div className="mt-5 flex gap-2">
         <ButtonLink href="/hq" variant="secondary">
