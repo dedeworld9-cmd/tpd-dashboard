@@ -41,3 +41,12 @@ export async function listCorrections():Promise<Correction[]> {
  if(error) throw new Error(error.message);
  return (data??[]) as Correction[];
 }
+
+/** Officer-only correction history; supervisors must not confuse other members' requests with their own. */
+export async function listMyCorrections(personnelId: string): Promise<Correction[]> {
+ const {data,error}=await api().from("patrol_corrections")
+ .select("id,session_id,requester_id,proposed_started_at,proposed_ended_at,reason,status,reviewer_reason,created_at,reviewed_at")
+ .eq("requester_id",personnelId).order("created_at",{ascending:false}).limit(100);
+ if(error) throw new Error(error.message);
+ return (data??[]) as Correction[];
+}
