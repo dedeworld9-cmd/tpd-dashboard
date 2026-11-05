@@ -1,4 +1,4 @@
-name: Phase 8 browser QA
+name: Phase 8 security and browser QA
 on:
   push:
     branches: [phase8-release-hardening]
