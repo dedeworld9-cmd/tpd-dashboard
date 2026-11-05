@@ -35,8 +35,8 @@ export function LiveOverview() {
       <PageHeader eyebrow={new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} title={`${greeting()}, ${me.name}`} description={`${me.rank}${me.callsign ? ` · ${me.callsign}` : ""}${me.district ? ` · ${me.district} District` : ""}`} />
       <div className="space-y-5">
         <VerifiedIdentity />
-        <Callout tone="info" title="Patrol, requests and training are not connected yet">
-          They need a server-side record. Until that exists these workspaces stay closed and no activity figures are shown.
+        <Callout tone="info" title="Requests and training are not connected yet">
+          Patrol and Activity now use server-recorded sessions. Requests and training remain closed until their server-side records are built.
         </Callout>
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Card>
