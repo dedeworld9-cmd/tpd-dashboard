@@ -72,6 +72,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               ["/#districts", "Patrol districts"],
               ["/#divisions", "Divisions"],
               ["/#leadership", "Leadership"],
+              ["/ride-alongs", "Civilian ride-alongs"],
             ]}
           />
           <FooterCol
@@ -90,7 +91,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           />
         </div>
         <div className="border-t border-dark-line">
-          <p className="mx-auto max-w-7xl px-4 py-4 text-3xs text-on-dark-muted sm:px-6 lg:px-8">Unofficial roleplay website. Design preview, not yet released.</p>
+          <p className="mx-auto max-w-7xl px-4 py-4 text-3xs text-on-dark-muted sm:px-6 lg:px-8">Unofficial Florida State Roleplay website. Not affiliated with the real Tampa Police Department.</p>
         </div>
       </footer>
     </div>
