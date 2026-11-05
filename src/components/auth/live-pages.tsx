@@ -35,8 +35,8 @@ export function LiveOverview() {
       <PageHeader eyebrow={new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} title={`${greeting()}, ${me.name}`} description={`${me.rank}${me.callsign ? ` · ${me.callsign}` : ""}${me.district ? ` · ${me.district} District` : ""}`} />
       <div className="space-y-5">
         <VerifiedIdentity />
-        <Callout tone="info" title="Training is not connected yet">
-          Patrol, Activity and Requests use server-side records. Training remains closed until its backend is built.
+        <Callout tone="info" title="Training sign-offs are now recorded">
+          Patrol, Activity, Requests and Training sign-offs use server-side records. Independent-patrol clearance remains a separate Office of the Chiefs decision.
         </Callout>
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Card>
