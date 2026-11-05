@@ -17,7 +17,6 @@ import { clearLiveRoster, setLiveRoster } from "@/lib/preview/store";
 const NOT_CONNECTED: { prefix: string; label: string }[] = [
   { prefix: "/hq/training", label: "Training" },
   { prefix: "/hq/requests", label: "Requests" },
-  { prefix: "/hq/supervisor", label: "Supervisor desk" },
 ];
 
 export function notConnectedArea(pathname: string): string | null {
