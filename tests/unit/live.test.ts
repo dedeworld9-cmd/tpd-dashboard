@@ -141,8 +141,8 @@ describe("membership answers", () => {
 
 describe("workspaces with no server record", () => {
   it("are closed in live mode", () => {
-    for (const p of ["/hq/training", "/hq/requests", "/hq/supervisor"]) expect(notConnectedArea(p)).toBeTruthy();
-    for (const p of ["/hq/patrol", "/hq/patrol/", "/hq/activity", "/hq/activity/"]) expect(notConnectedArea(p)).toBeNull();
+    for (const p of ["/hq/training", "/hq/requests"]) expect(notConnectedArea(p)).toBeTruthy();
+    for (const p of ["/hq/patrol", "/hq/patrol/", "/hq/activity", "/hq/activity/", "/hq/supervisor"]) expect(notConnectedArea(p)).toBeNull();
     for (const p of ["/hq", "/hq/roster", "/hq/structure", "/hq/divisions/swat", "/hq/resources", "/hq/command", "/hq/command/integrations", "/hq/settings"]) expect(notConnectedArea(p)).toBeNull();
   });
 });
