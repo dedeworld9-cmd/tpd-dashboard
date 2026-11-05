@@ -16,7 +16,6 @@ import { clearLiveRoster, setLiveRoster } from "@/lib/preview/store";
 /** Routes that have no server-side record yet. They stay closed in live mode instead of saving into the browser. */
 const NOT_CONNECTED: { prefix: string; label: string }[] = [
   { prefix: "/hq/training", label: "Training" },
-  { prefix: "/hq/requests", label: "Requests" },
 ];
 
 export function notConnectedArea(pathname: string): string | null {
@@ -120,7 +119,7 @@ export function NotConnected({ area }: { area: string }) {
     <Page>
       <PageHeader eyebrow="Headquarters" title={`${area} is not connected yet`} description="This workspace needs a server-side record that has not been built, so it is closed instead of saving into your browser." />
       <Callout tone="info" title="Nothing here is recorded or counted yet">
-        Patrol sessions and recorded activity are stored server-side. Requests and training progress remain unavailable until their own records are implemented. Your verified identity, personnel directory, department structure, divisions and resources are live.
+        Patrol sessions and recorded activity are stored server-side. Requests are submitted and reviewed server-side. Training progress is not connected yet. Your verified identity, personnel directory, department structure, divisions and resources are live.
       </Callout>
       <div className="mt-5 flex gap-2">
         <ButtonLink href="/hq" variant="secondary">
