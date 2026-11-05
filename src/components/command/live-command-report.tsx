@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Clock3, ClipboardList, Shield, Users, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, Clock3, Shield, Users, UserRoundCheck } from "lucide-react";
 import { Page, PageHeader } from "@/components/shell/page";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Callout, EmptyState } from "@/components/ui/feedback";
-import { Card, CardHeader, Stat } from "@/components/ui/surface";
+import { Card, CardHeader } from "@/components/ui/surface";
 import { useVerifiedMember } from "@/lib/backend/auth";
 import { can } from "@/lib/authz";
 import { actorFor } from "@/lib/backend/membership";
