@@ -1,4 +1,4 @@
-name: Publish TPD HQ Phase 6
+name: Publish TPD HQ Phase 7
 
 on:
   workflow_dispatch:
@@ -17,10 +17,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out verified Phase 6 build
+      - name: Check out verified Phase 7 build
         uses: actions/checkout@v4
         with:
-          ref: b2a0d8da8fe1882fe2bcb6b25797d4ac4f0fb586
+          ref: d6bd57ce93946c0e71da0e49074d23678e41c9f1
           persist-credentials: false
       - name: Node
         uses: actions/setup-node@v4
@@ -53,6 +53,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
-          git commit -m "Publish TPD Headquarters Phase 6 - clearance and personnel administration"
+          git commit -m "Publish TPD Headquarters Phase 7 - live command reporting"
           header=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
           git -c "http.extraheader=AUTHORIZATION: basic $header" push --force "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages
