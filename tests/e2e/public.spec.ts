@@ -44,6 +44,6 @@ test("civilian ride-along entry is prominent and routes to source-grounded instr
   await page.getByRole("link", { name: "Full instructions" }).click();
   await expect(page).toHaveURL(/\/ride-alongs\/?$/);
   await expect(page.getByRole("heading", { level: 1, name: "Civilian ride-alongs" })).toBeVisible();
-  await expect(page.getByText(/assigned officer's Sergeant or higher/)).toBeVisible();
+  await expect(page.getByText(/assigned officer.s Sergeant or higher/)).toBeVisible();
   await expect(page.getByText(/Never provide actual identity documents/)).toBeVisible();
 });
