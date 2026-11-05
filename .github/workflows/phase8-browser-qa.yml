@@ -19,7 +19,7 @@ jobs:
       - name: Audit production npm dependencies
         run: npm audit --omit=dev --audit-level=high
       - name: Install Chromium (desktop/mobile emulation)
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Run existing desktop and mobile browser suite
         run: npm run test:e2e
         env:
