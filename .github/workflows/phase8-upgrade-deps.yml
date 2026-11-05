@@ -20,6 +20,11 @@ jobs:
       - run: npm ci
       - name: Install patched compatible Next.js and ESLint config
         run: npm install next@15.5.29 eslint-config-next@15.5.29 --save-exact
+      - name: Patch compatible transitive dependencies
+        run: |
+          npm pkg set "overrides.next.postcss=8.5.23"
+          npm audit fix --omit=dev || true
+          npm install --package-lock-only
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
