@@ -11,6 +11,7 @@ import { useVerifiedMember } from "@/lib/backend/auth";
 import { patrolEnd, patrolHistory, patrolStart, type RecordedPatrol } from "@/lib/backend/patrol";
 import { formatClock, formatMinutes, weekMinutes } from "@/lib/domain/activity";
 import { requestCorrection, listMyCorrections, type Correction } from "@/lib/backend/patrol-corrections";
+import { myPatrolClearance } from "@/lib/backend/phase6";
 
 const fmt = (value: string) => new Date(value).toLocaleString();
 function elapsedSeconds(s: RecordedPatrol, now: number): number {
@@ -46,6 +47,7 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
   const [sessions, setSessions] = useState<RecordedPatrol[]>([]);
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearance, setClearance] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [district, setDistrict] = useState<"North" | "South">("North");
@@ -58,10 +60,12 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
     setLoading(true);
     setError("");
     try {
-      const [patrols, correctionRows] = await Promise.all([patrolHistory(), listMyCorrections(memberId)]);
+      const [patrols, correctionRows, verifiedClearance] = await Promise.all([patrolHistory(), listMyCorrections(memberId), myPatrolClearance()]);
       setSessions(patrols);
       setCorrections(correctionRows);
+      setClearance(verifiedClearance);
     } catch (e) {
+      setClearance(false);
       setError(e instanceof Error ? e.message : "Could not load patrol history.");
     } finally {
       setLoading(false);
@@ -111,7 +115,7 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
   }
 
   if (!me) return null;
-  const isProbationary = me.rank === "Probationary Officer";
+  const isProbationary = me.rank === "Probationary Officer" && !clearance;
   return (
     <Page wide>
       <PageHeader eyebrow="Operations" title={section === "patrol" ? "Patrol console" : "My activity"}
@@ -141,7 +145,7 @@ export function LivePatrol({ section = "patrol" }: { section?: "patrol" | "activ
                     </label>
                   ))}
                 </fieldset>
-                {isProbationary ? <p className="mt-4 text-xs text-amber">Independent patrol is locked until training approval exists.</p> :
+                {isProbationary ? <p className="mt-4 text-xs text-amber">Independent patrol requires all training sign-offs and separate Office of the Chiefs clearance.</p> :
                   <Button variant="gold" size="lg" className="mt-5" disabled={busy || loading} loading={busy} onClick={() => void run("start")}>Start patrol</Button>}
               </>
             )}
