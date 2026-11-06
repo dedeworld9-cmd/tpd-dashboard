@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, FileText, ShieldCheck } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
-import { CIVILIAN_RIDE_ALONG_DOCUMENT, CIVILIAN_RIDE_ALONG_STEPS } from "@/lib/public-ride-alongs";
+import { CIVILIAN_RIDE_ALONG_COPY_URL, CIVILIAN_RIDE_ALONG_TICKET_URL, CIVILIAN_RIDE_ALONG_STEPS } from "@/lib/public-ride-alongs";
 
 export const metadata:Metadata={title:"Civilian Ride-Alongs | TPD Roleplay",description:"Copy the civilian ride-along application, submit it in a TPD Discord ticket, and receive supervisory review."};
 
@@ -12,7 +12,8 @@ export default function RideAlongPage(){
   <h1 className="display-x mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Civilian ride-alongs</h1>
   <p className="mt-5 max-w-2xl text-base leading-relaxed text-ink-2">Apply to accompany an available Tampa Police Department roleplay officer on a patrol. Applications are submitted and reviewed in the department Discord ticket system, not on this website.</p>
   <div className="mt-7 flex flex-wrap gap-3">
-   <a href={CIVILIAN_RIDE_ALONG_DOCUMENT} target="_blank" rel="noopener noreferrer" className={buttonClass("primary","lg")}><FileText className="size-4" aria-hidden/> Open application document <ArrowUpRight className="size-4" aria-hidden/></a>
+   <a href={CIVILIAN_RIDE_ALONG_COPY_URL} target="_blank" rel="noopener noreferrer" className={buttonClass("primary","lg")}><FileText className="size-4" aria-hidden/> Make a Copy <ArrowUpRight className="size-4" aria-hidden/></a>
+   <a href={CIVILIAN_RIDE_ALONG_TICKET_URL} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary","lg")}>Open a Ticket <ArrowUpRight className="size-4" aria-hidden/></a>
    <Link href="/" className={buttonClass("secondary","lg")}>Back to homepage</Link>
   </div>
   <section aria-labelledby="steps-title" className="mt-14">
@@ -24,8 +25,8 @@ export default function RideAlongPage(){
   </section>
   <section aria-labelledby="review-title" className="mt-10 rounded-xl border border-line bg-surface p-6">
    <h2 id="review-title" className="flex items-center gap-2 text-base font-semibold"><ShieldCheck className="size-5 text-gold-ink"/> Ticket review and approval</h2>
-   <p className="mt-3 text-sm leading-relaxed text-ink-2">Open the designated civilian ride-along ticket inside the TPD roleplay Discord, share your completed copy with the reviewing staff, and follow all instructions in that ticket. The ticket is where the decision is communicated. The assigned officer’s Sergeant or higher must approve before participation; the Chief or designee may deny or revoke permission under Personnel Handbook §12.1.</p>
-   <p className="mt-3 text-sm text-muted">Do not treat document completion, a ticket submission, or a website link as approval.</p>
+   <p className="mt-3 text-sm leading-relaxed text-ink-2">Use the Open a Ticket button to enter the TPD Tickets V2 panel. Join the server if necessary, create a civilian ride-along ticket, share your completed copy with the reviewing staff, and follow all instructions in that ticket. The ticket is where the decision is communicated. The assigned officer’s Sergeant or higher must approve before participation; the Chief or designee may deny or revoke permission under Personnel Handbook §12.1.</p>
+   <p className="mt-3 text-sm text-muted">The button opens the ticket panel channel; it does not automatically create a ticket. Do not treat document completion, a ticket submission, or a website link as approval.</p>
   </section>
   <p className="mt-6 rounded-lg border border-line p-4 text-xs leading-relaxed text-muted">This is a fictional Roblox roleplay program, not the real Tampa Police Department’s Citizen Observer Program. The linked source is an adapted reference draft containing real-world form fields and legal wording. Never provide actual identity documents, birth dates, addresses, phone numbers, or emergency-contact information in roleplay applications or tickets. Use only roleplay-appropriate information and follow the roleplay department’s staff guidance.</p>
  </div>;

@@ -5,16 +5,23 @@
 export const CIVILIAN_RIDE_ALONG_DOCUMENT =
   "https://docs.google.com/document/d/1hRNCfBXZsO6N9Mo7jpv_HQ2rF078AJUeuLHQPwOLxBY/edit?tab=t.0";
 
+export const CIVILIAN_RIDE_ALONG_COPY_URL =
+  "https://docs.google.com/document/d/1hRNCfBXZsO6N9Mo7jpv_HQ2rF078AJUeuLHQPwOLxBY/copy";
+
+/** Tickets V2 panel channel; this opens the panel, not a pre-created ticket. */
+export const CIVILIAN_RIDE_ALONG_TICKET_URL =
+  "https://discord.com/channels/1563693949527523428/1563693950072656051";
+
 export const CIVILIAN_RIDE_ALONG_STEPS = [
   {
     title: "Make your own copy",
     detail:
-      "Open the application reference in Google Docs. Choose File → Make a copy, then complete your personal copy using roleplay information only.",
+      "Select Make a Copy to create your own Google Doc, then fill it out using roleplay information only.",
   },
   {
     title: "Open a civilian ride-along ticket",
     detail:
-      "In the TPD roleplay Discord server, open the designated civilian ride-along ticket and provide a link to your completed Google Doc copy. Set its sharing access so the ticket reviewers can read it.",
+      "Use Open a Ticket to reach the Tickets V2 panel in TPD Discord, then create a civilian ride-along ticket. Share your completed Google Doc copy with ticket reviewers using appropriate read access.",
   },
   {
     title: "Wait for the review",

@@ -35,15 +35,19 @@ test("civilian ride-along entry is prominent and routes to source-grounded instr
   await page.goto("/");
   const rideAlongs = page.locator("#ride-alongs");
   await expect(rideAlongs.getByRole("heading", { name: /Experience a patrol shift/ })).toBeVisible();
-  await expect(rideAlongs.getByRole("link", { name: /Open application/ })).toHaveAttribute(
+  await expect(rideAlongs.getByRole("link", { name: /Make a Copy/ })).toHaveAttribute(
     "href",
-    "https://docs.google.com/document/d/1hRNCfBXZsO6N9Mo7jpv_HQ2rF078AJUeuLHQPwOLxBY/edit?tab=t.0",
+    "https://docs.google.com/document/d/1hRNCfBXZsO6N9Mo7jpv_HQ2rF078AJUeuLHQPwOLxBY/copy",
   );
   await expect(rideAlongs).toContainText("Make your own copy");
-  await expect(rideAlongs).toContainText("Discord ticket");
+  await expect(rideAlongs).toContainText("Tickets V2");
+  await expect(rideAlongs.getByRole("link", { name: /Open a Ticket/ })).toHaveAttribute("href", "https://discord.com/channels/1563693949527523428/1563693950072656051");
+  await expect(rideAlongs.getByRole("link", { name: /Open a Ticket/ })).toHaveAttribute("target", "_blank");
   await page.getByRole("link", { name: "Full instructions" }).click();
   await expect(page).toHaveURL(/\/ride-alongs\/?$/);
   await expect(page.getByRole("heading", { level: 1, name: "Civilian ride-alongs" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Make a Copy/ })).toHaveAttribute("href", "https://docs.google.com/document/d/1hRNCfBXZsO6N9Mo7jpv_HQ2rF078AJUeuLHQPwOLxBY/copy");
+  await expect(page.getByRole("link", { name: /Open a Ticket/ })).toHaveAttribute("href", "https://discord.com/channels/1563693949527523428/1563693950072656051");
   await expect(page.getByText(/assigned officer.s Sergeant or higher/)).toBeVisible();
   await expect(page.getByText(/Never provide actual identity documents/)).toBeVisible();
 });
