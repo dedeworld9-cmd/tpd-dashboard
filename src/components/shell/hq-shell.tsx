@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -9,15 +10,19 @@ import { Dialog } from "@/components/ui/overlay";
 import { Kbd } from "@/components/ui/field";
 import { Toaster } from "@/components/ui/feedback";
 import { LiveGate, NotConnected, notConnectedArea } from "@/components/auth/live-gate";
-import { AuthProvider, useIsLive } from "@/lib/backend/auth";
+import { AuthProvider, useIsLive, useVerifiedMember } from "@/lib/backend/auth";
+import { pushRecentPage } from "@/lib/ux/recents";
 import { cn } from "@/lib/cn";
 import { pushRecent } from "@/lib/preview/store";
-import { CommandPalette } from "./command-palette";
-import { GO_TO } from "./nav-config";
-import { NewRequestDialog, type NewRequestType } from "./new-request-dialog";
+import { GO_TO, PAGES } from "./nav-config";
+import type { NewRequestType } from "./new-request-dialog";
 import { isActive, Sidebar } from "./sidebar";
 import { ShellContext, SHORTCUTS, type ShellApi } from "./shell-context";
 import { Topbar } from "./topbar";
+
+// Loaded on first use: neither is needed to paint the page, and both pull in search and form code.
+const CommandPalette = dynamic(() => import("./command-palette").then((m) => m.CommandPalette), { ssr: false });
+const NewRequestDialog = dynamic(() => import("./new-request-dialog").then((m) => m.NewRequestDialog), { ssr: false });
 
 const COLLAPSE_KEY = "tpd-sidebar-collapsed";
 
@@ -44,12 +49,16 @@ function ShellInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [palette, setPalette] = useState(false);
+  // Stay mounted after the first open so the close transition and focus restore still run.
+  const [paletteSeen, setPaletteSeen] = useState(false);
+  const [newReqSeen, setNewReqSeen] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [newReq, setNewReq] = useState<{ open: boolean; type?: NewRequestType }>({ open: false });
   const pendingG = useRef<number>(0);
   const live = useIsLive();
   const closedArea = live ? notConnectedArea(pathname) : null;
+  const memberId = useVerifiedMember()?.id ?? "preview";
 
   useEffect(() => {
     try {
@@ -58,9 +67,18 @@ function ShellInner({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (palette) setPaletteSeen(true);
+  }, [palette]);
+  useEffect(() => {
+    if (newReq.open) setNewReqSeen(true);
+  }, [newReq.open]);
+
+  useEffect(() => {
     pushRecent(pathname);
+    const href = pathname.replace(/\/+$/, "") || "/";
+    if (!closedArea) pushRecentPage(memberId, href, (h) => PAGES.some((p) => p.href === h));
     setDrawer(false);
-  }, [pathname]);
+  }, [pathname, closedArea, memberId]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((c) => {
@@ -143,8 +161,8 @@ function ShellInner({ children }: { children: ReactNode }) {
       <MobileTabBar pathname={pathname} onSearch={() => setPalette(true)} onMenu={() => setDrawer(true)} />
       <Drawer open={drawer} onClose={() => setDrawer(false)} />
 
-      <CommandPalette open={palette} onClose={() => setPalette(false)} />
-      <NewRequestDialog open={newReq.open} initialType={newReq.type} onClose={() => setNewReq({ open: false })} />
+      {(palette || paletteSeen) && <CommandPalette open={palette} onClose={() => setPalette(false)} />}
+      {(newReq.open || newReqSeen) && <NewRequestDialog open={newReq.open} initialType={newReq.type} onClose={() => setNewReq({ open: false })} />}
       <Dialog open={shortcuts} onClose={() => setShortcuts(false)} title="Keyboard shortcuts" description="Shortcuts are off while you type in a field.">
         <ul className="divide-y divide-line">
           {SHORTCUTS.map((s) => (

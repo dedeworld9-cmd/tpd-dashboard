@@ -26,18 +26,24 @@ import { Kbd } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/tabs";
 import { can } from "@/lib/authz";
 import { cn } from "@/lib/cn";
-import { useIsLive } from "@/lib/backend/auth";
+import { notConnectedArea } from "@/components/auth/live-gate";
+import { useIsLive, useVerifiedMember } from "@/lib/backend/auth";
+import { highlight, PAGE_ALIASES, score } from "@/lib/ux/palette-search";
+import { requestOpenMember } from "@/lib/ux/pending-member";
+import { readRecents } from "@/lib/ux/recents";
 import { useMe } from "@/lib/preview/hooks";
-import { allMembers, ROLE_PERSONA, setRole, usePreview, type PatrolDistrict, type PreviewRole } from "@/lib/preview/store";
+import { allMembers, ROLE_PERSONA, setRole, type PatrolDistrict, type PreviewRole } from "@/lib/preview/store";
 import { HANDBOOK_URL, USE_OF_FORCE_URL } from "@/lib/public-nav";
 import { DIVISIONS } from "@/lib/sample-data";
-import { ANCHORCAD_URL, PAGES } from "./nav-config";
+import { ANCHORCAD_URL, GO_TO, PAGES } from "./nav-config";
 import { useShell } from "./shell-context";
 import { toggleTheme } from "./theme";
 
 interface Entry {
   id: string;
   group: "Recent" | "Actions" | "Pages" | "Personnel" | "Divisions" | "Policies" | "Preview";
+  /** Keyboard shortcut shown as a hint, e.g. "G M". */
+  shortcut?: string;
   label: string;
   hint?: string;
   keywords?: string;
@@ -50,14 +56,8 @@ interface Entry {
 
 const GROUP_ORDER: Entry["group"][] = ["Recent", "Actions", "Pages", "Personnel", "Divisions", "Policies", "Preview"];
 
-function score(e: Entry, q: string): number {
-  if (!q) return 1;
-  const hay = `${e.label} ${e.hint ?? ""} ${e.keywords ?? ""}`.toLowerCase();
-  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.every((t) => hay.includes(t))) return 0;
-  const l = e.label.toLowerCase();
-  return l.startsWith(terms[0]) ? 3 : l.includes(terms[0]) ? 2 : 1;
-}
+const SHORTCUT_FOR: Record<string, string> = Object.fromEntries(Object.entries(GO_TO).map(([k, href]) => [href, `G ${k.toUpperCase()}`]));
+const pageKnown = (href: string) => PAGES.some((p) => p.href === href);
 
 /**
  * Global command palette (Ctrl/⌘K). Every entry runs a real navigation or
@@ -71,7 +71,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const router = useRouter();
   const me = useMe();
   const live = useIsLive();
-  const recentsState = usePreview((s) => s.recents);
+  const verified = useVerifiedMember();
+  const [recentsState, setRecents] = useState<string[]>([]);
   const patrolApi = usePatrol();
   const { openNewRequest, openShortcuts } = useShell();
   const [q, setQ] = useState("");
@@ -85,12 +86,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     if (open && !d.open) {
       setQ("");
       setActive(0);
+      setRecents(readRecents(verified?.id ?? "preview", pageKnown));
       setConfirmStart(false);
       d.showModal();
       requestAnimationFrame(() => input.current?.focus());
     }
     if (!open && d.open) d.close();
-  }, [open]);
+  }, [open, verified?.id]);
 
   useEffect(() => {
     if (me?.member.district === "South") setDistrict("South");
@@ -107,7 +109,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
     // Actions
     const onDuty = patrolApi.phase === "on-duty";
-    if (onDuty) {
+    // Live mode: patrol, requests and corrections have no server-side record yet, so they are not offered at all.
+    if (live) {
+      // nothing patrol- or request-related
+    } else if (onDuty) {
       out.push({ id: "a-end", group: "Actions", label: "End patrol", hint: "Asks to confirm", icon: Square, keywords: "stop clock off duty", run: () => (onClose(), patrolApi.requestEnd()) });
     } else {
       out.push({
@@ -131,18 +136,33 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       external: true,
       run: () => (onClose(), window.open(ANCHORCAD_URL, "_blank", "noopener")),
     });
-    out.push({ id: "a-new", group: "Actions", label: "New request", hint: "N", icon: ClipboardPlus, keywords: "loa leave transfer division ride-along", run: () => (onClose(), openNewRequest()) });
-    out.push({ id: "a-loa", group: "Actions", label: "Request leave of absence", icon: ClipboardPlus, keywords: "loa", run: () => (onClose(), openNewRequest("Leave of absence")) });
-    out.push({ id: "a-correction", group: "Actions", label: "Request an activity correction", icon: History, keywords: "fix session time", run: go("/hq/patrol#history") });
-    if (can(me.actor, "command.view")) out.push({ id: "a-queue", group: "Actions", label: "Review decision queue", icon: FileText, keywords: "approve deny command", run: go("/hq/command") });
+    if (!live) out.push({ id: "a-new", group: "Actions", label: "New request", hint: "N", icon: ClipboardPlus, keywords: "loa leave transfer division ride-along", run: () => (onClose(), openNewRequest()) });
+    if (!live) out.push({ id: "a-loa", group: "Actions", label: "Request leave of absence", icon: ClipboardPlus, keywords: "loa", run: () => (onClose(), openNewRequest("Leave of absence")) });
+    if (!live) out.push({ id: "a-correction", group: "Actions", label: "Request an activity correction", icon: History, keywords: "fix session time", run: go("/hq/patrol#history") });
+    if (live) {
+      if (can(me.actor, "command.view")) out.push({ id: "a-integrations", group: "Actions", label: "Check integrations", icon: FileText, keywords: "discord google sheets sync health", run: go("/hq/command/integrations") });
+    } else if (can(me.actor, "command.view")) out.push({ id: "a-queue", group: "Actions", label: "Review decision queue", icon: FileText, keywords: "approve deny command", run: go("/hq/command") });
     else if (can(me.actor, "request.review")) out.push({ id: "a-queue", group: "Actions", label: "Review assigned requests", icon: FileText, keywords: "approve deny", run: go("/hq/requests?view=review") });
     out.push({ id: "a-theme", group: "Actions", label: "Toggle light or dark theme", icon: Moon, keywords: "appearance", run: () => toggleTheme() });
     out.push({ id: "a-keys", group: "Actions", label: "Keyboard shortcuts", hint: "?", icon: Keyboard, run: () => (onClose(), openShortcuts()) });
 
-    for (const p of pages.filter((p) => !p.parent)) out.push({ id: `p-${p.href}`, group: "Pages", label: p.label, hint: p.href.replace("/hq", "") || "/", icon: FileText, run: go(p.href) });
+    for (const p of pages.filter((p) => !p.parent || PAGE_ALIASES[p.href])) {
+      const closed = live ? notConnectedArea(p.href) : null;
+      out.push({
+        id: `p-${p.href}`,
+        group: "Pages",
+        label: p.label,
+        hint: p.href.replace("/hq", "") || "/",
+        keywords: PAGE_ALIASES[p.href],
+        shortcut: SHORTCUT_FOR[p.href],
+        icon: FileText,
+        disabled: closed ? "Not connected yet" : undefined,
+        run: go(p.href),
+      });
+    }
     for (const d of DIVISIONS) out.push({ id: `d-${d.slug}`, group: "Divisions", label: d.name, hint: d.callsign ? `${d.callsign} · ${d.prefix}` : d.prefix, icon: Building2, run: go(`/hq/divisions/${d.slug}`) });
     if (can(me.actor, "roster.view")) {
-      for (const m of allMembers()) out.push({ id: `m-${m.id}`, group: "Personnel", label: m.name, hint: `${m.callsign} · ${m.rank}`, avatar: m.name, keywords: `${m.district} ${m.divisions.join(" ")}`, run: go(`/hq/roster?member=${m.id}`) });
+      for (const m of allMembers()) out.push({ id: `m-${m.id}`, group: "Personnel", label: m.name, hint: `${m.callsign} · ${m.rank}`, avatar: m.name, keywords: `${m.district} ${m.divisions.join(" ")}`, run: live ? () => (onClose(), requestOpenMember(m.id), router.push("/hq/roster")) : go(`/hq/roster?member=${m.id}`) });
     }
     out.push({ id: "pol-hb", group: "Policies", label: "Personnel Handbook", icon: BookOpen, keywords: "policy hb", external: true, run: () => (onClose(), window.open(HANDBOOK_URL, "_blank", "noopener")) });
     out.push({ id: "pol-uof", group: "Policies", label: "Use of Force Policy", icon: BookOpen, keywords: "policy uof", external: true, run: () => (onClose(), window.open(USE_OF_FORCE_URL, "_blank", "noopener")) });
@@ -158,7 +178,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     if (!query) {
       const recent: Entry[] = (recentsState ?? [])
         .map((href) => PAGES.find((p) => p.href === href))
-        .filter((p): p is (typeof PAGES)[number] => !!p && (!p.capability || (!!me && can(me.actor, p.capability))))
+        .filter((p): p is (typeof PAGES)[number] => !!p && (!p.capability || (!!me && can(me.actor, p.capability))) && !(live && notConnectedArea(p.href)))
         .slice(0, 4)
         .map((p) => ({ id: `rc-${p.href}`, group: "Recent", label: p.label, icon: History, run: () => (onClose(), router.push(p.href)) }));
       const top = entries.filter((e) => e.group === "Actions").slice(0, 6);
@@ -171,7 +191,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       .sort((a, b) => GROUP_ORDER.indexOf(a.e.group) - GROUP_ORDER.indexOf(b.e.group) || b.s - a.s)
       .map((x) => x.e)
       .slice(0, 40);
-  }, [q, entries, recentsState, me, onClose, router]);
+  }, [q, entries, recentsState, me, live, onClose, router]);
 
   const selectable = results.filter((r) => !r.disabled);
   const current = selectable[Math.min(active, selectable.length - 1)];
@@ -252,7 +272,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               onKeyDown={onKeyDown}
               placeholder="Search pages, people, divisions, actions…"
               role="combobox"
-              aria-expanded
+              aria-expanded={results.length > 0}
+              aria-autocomplete="list"
               aria-controls={listId}
               aria-activedescendant={current ? `pal-${current.id}` : undefined}
               aria-label="Search commands"
@@ -260,9 +281,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             />
             <Kbd>Esc</Kbd>
           </div>
-          <div ref={list} id={listId} role="listbox" aria-label="Results" className="scrollbar-thin max-h-[min(60vh,420px)] overflow-y-auto p-1.5">
+          <p role="status" className="sr-only">
+            {results.length === 0 ? "No results" : `${results.length} result${results.length === 1 ? "" : "s"}`}
+          </p>
+          <div ref={list} id={listId} role={results.length ? "listbox" : undefined} aria-label={results.length ? "Results" : undefined} className="scrollbar-thin max-h-[min(60vh,420px)] overflow-y-auto p-1.5">
             {results.length === 0 ? (
-              <p className="px-3 py-10 text-center text-xs text-muted">No pages, people or actions match “{q}”.</p>
+              <div className="px-3 py-9 text-center text-xs text-muted">
+                <p>No pages, people or actions match “{q}”.</p>
+                <p className="mt-1 text-3xs">Try a page name, a person’s name or call sign, or a word like “roster”, “handbook” or “discord”.</p>
+              </div>
             ) : (
               results.map((r) => {
                 const header = r.group !== lastGroup ? r.group : null;
@@ -288,8 +315,19 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       ) : r.icon ? (
                         <r.icon aria-hidden className={cn("size-4 shrink-0", isActive ? "text-gold-ink" : "text-muted")} />
                       ) : null}
-                      <span className="min-w-0 flex-1 truncate font-medium">{r.label}</span>
-                      <span className="max-w-[45%] truncate text-3xs text-muted">{r.disabled ?? r.hint}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        {highlight(r.label, q).map((run, i) =>
+                          run.hit ? (
+                            <b key={i} className="font-bold text-gold-ink underline decoration-gold/60 decoration-2 underline-offset-2">
+                              {run.text}
+                            </b>
+                          ) : (
+                            <span key={i}>{run.text}</span>
+                          ),
+                        )}
+                      </span>
+                      <span className="max-w-[40%] truncate text-3xs text-muted">{r.disabled ?? r.hint}</span>
+                      {r.shortcut && !r.disabled ? <Kbd>{r.shortcut}</Kbd> : null}
                       {r.external && !r.disabled ? <ExternalLink aria-label="Opens in a new tab" className="size-3 text-muted" /> : null}
                       {isActive ? <CornerDownLeft aria-hidden className="size-3.5 text-muted" /> : null}
                     </div>

@@ -100,14 +100,13 @@ test.describe("with a backend (stubbed)", () => {
     await as(page, { state: "verified", last_sync_at: "2026-11-04T01:00:00Z", member });
     await page.goto("/hq");
     await expect(page.getByRole("heading", { level: 1, name: /A\. Example/ })).toBeVisible();
-    await expect(page.getByText("Waterfront Unit (W-12, Officer)")).toBeVisible();
-    await expect(page.getByText("2015 Charger", { exact: true })).toBeVisible();
+    await expect(page.getByText("Waterfront Unit (W-12)").first()).toBeVisible();
     await noDemo(page);
     await page.goto("/hq/roster");
     await expect(page.getByRole("heading", { level: 1, name: "Personnel" })).toBeVisible();
     await expect(page.getByRole("cell", { name: /B\. Captain/ })).toBeVisible();
     await expect(page.getByRole("cell", { name: "X-309" })).toBeVisible();
-    await expect(page.getByText("Waterfront Unit", { exact: true }).first()).toBeVisible();
+    await expect(page.locator("td", { hasText: "Waterfront Unit" }).first()).toBeVisible();
     await noDemo(page);
     // Directory figures are the stubbed rows only: no 14-person demo roster.
     await expect(page.getByText("Verified roster · 2 active")).toBeVisible();
@@ -223,5 +222,69 @@ test.describe("with a backend (stubbed)", () => {
     await page.goto("/hq/command/integrations");
     await expect(page.getByRole("button", { name: "Run health checks" })).toBeVisible();
     await expect(page.getByText("Connected", { exact: true })).toHaveCount(0);
+  });
+
+  test("Overview is role-aware and shows no invented figures", async ({ page }) => {
+    await as(page, { state: "verified", last_sync_at: "2026-11-04T01:00:00Z", member });
+    await page.goto("/hq");
+    await expect(page.getByRole("heading", { level: 2, name: "Your record" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Not connected yet" })).toBeVisible();
+    await expect(page.getByText("Roster last synced")).toBeVisible();
+    // An Officer gets no Command card; nothing claims patrol hours or request counts.
+    await expect(page.getByRole("heading", { level: 2, name: "Command" })).toHaveCount(0);
+    await expect(page.getByText(/Command access/)).toHaveCount(0);
+    await expect(page.getByText(/\b\d+h \d+m\b/)).toHaveCount(0);
+    await noDemo(page);
+    await page.unrouteAll();
+    await as(page, { state: "verified", member: { ...member, id: directory[1].id, name: "B. Captain", rank: "Captain", callsign: "X-309", district: null } });
+    await page.goto("/hq");
+    await expect(page.getByText("Command access").first()).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Command" })).toBeVisible();
+  });
+
+  test("personnel filters, result count, reset and detail sheet", async ({ page }) => {
+    await as(page, { state: "verified", member });
+    await page.goto("/hq/roster");
+    const status = page.getByRole("status").filter({ hasText: /of 2|2 members|2 results|Showing/ }).first();
+    await expect(status).toBeVisible();
+    await page.getByRole("combobox", { name: "Rank" }).selectOption("Captain");
+    await expect(page.getByRole("cell", { name: /B\. Captain/ })).toBeVisible();
+    await expect(page.getByRole("cell", { name: /A\. Example/ })).toHaveCount(0);
+    await page.getByRole("combobox", { name: "Rank" }).selectOption("");
+    await page.getByRole("searchbox", { name: "Search personnel" }).fill("zzzz");
+    await expect(page.getByText("No members match").locator("visible=true")).toBeVisible();
+    await page.getByRole("button", { name: "Clear filters" }).locator("visible=true").click();
+    await expect(page.getByRole("cell", { name: /A\. Example/ })).toBeVisible();
+    // Detail sheet: opens from a row, shows roster fields only, Escape closes it.
+    await page.getByRole("cell", { name: /B\. Captain/ }).click();
+    const sheet = page.getByRole("dialog", { name: /B\. Captain/ });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText(/not connected yet/i)).toBeVisible();
+    expect(page.url()).not.toContain(directory[1].id);
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+  });
+
+  test("command palette respects live mode and scopes recents to the member", async ({ page }) => {
+    await as(page, { state: "verified", member });
+    await page.goto("/hq/roster");
+    await expect(page.getByRole("heading", { level: 1, name: "Personnel" })).toBeVisible();
+    await page.keyboard.press("Control+k");
+    const box = page.getByRole("combobox", { name: "Search commands" });
+    await expect(box).toBeFocused();
+    await box.fill("start patrol");
+    await expect(page.getByRole("option", { name: /Start patrol/ })).toHaveCount(0);
+    await box.fill("patrol");
+    await expect(page.getByRole("option", { name: /Patrol/ }).first()).toBeVisible();
+    await expect(page.getByText("Not connected yet").first()).toBeVisible();
+    // Choosing a person opens their sheet without putting an id in the URL.
+    await box.fill("captain");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", { name: /B\. Captain/ })).toBeVisible();
+    expect(page.url()).not.toContain(directory[1].id);
+    const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("tpd-recents:")));
+    expect(keys).toEqual([`tpd-recents:${member.id}`]);
+    const stored = await page.evaluate((k) => localStorage.getItem(k), `tpd-recents:${member.id}`);
+    expect(stored).not.toContain("Captain");
   });
 });

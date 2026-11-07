@@ -20,3 +20,31 @@ Method: production static build, headless Chromium, 16 routes x desktop (1440x90
 2. Skeleton and error states for the live directory load; retry button.
 3. Personnel table: saved filters and a mobile card layout instead of horizontal scroll.
 4. Measure bundle size per route (largest: /hq 220 kB first load) and split the command palette.
+
+## Advanced product experience pass (2026-11-07)
+
+Branch `redesign-black-gold` (PR #3). Frontend only: no migrations, no RLS changes, no deploy, no new backend surface.
+
+### Done
+- **Overview (live):** `components/auth/live-overview.tsx`. Role group derived from `can()` (command, supervisor, new member, member). Suggested next step only points at pages that exist in live mode. Record, team counts from the synced directory, resources, "Not connected yet" list, roster sync age. No patrol hours, request counts or other invented figures.
+- **Command palette:** scoring, aliases and highlighting in `lib/ux/palette-search.ts` (deterministic, unit tested). Recents are per member (`tpd-recents:<member id>`), page paths only, validated against known pages. Live mode offers no patrol or request actions; closed areas are shown disabled. Choosing a person opens their sheet through an in-memory handoff, so no id reaches the URL. Result count announced, `aria-expanded` follows results, listbox role only when options exist (axe finding fixed).
+- **Personnel (live):** rank, district and division filters (division only if present in data), search, result count, reset, mobile card list with paging, accessible detail sheet showing roster fields only.
+- **Performance:** palette and new-request dialog load on first use.
+
+### Performance (static export, `npm run build`, shared 102 kB both before and after)
+| Route | Baseline 73f79a2 | Now |
+|---|---|---|
+| /hq | 220 kB | 222 kB |
+| /hq/roster | 214 kB | 219 kB |
+| /hq/command | 218 kB | 223 kB |
+| /hq/patrol | 146 kB | 146 kB |
+
+First-load JS rose slightly because the Overview and Personnel views gained features. Lazy-loading the palette and dialog saved about 1 kB on /hq (223 to 222 in an A/B build). Making the preview-only workspaces dynamic imports changed nothing (they are prerendered, so still counted) and was reverted. Remaining finding: the preview Dashboard, personnel workspace and supabase client ship in every build because the live/preview switch is at runtime; splitting that by build flag is the next real saving. Runtime LCP/CLS were not measured.
+
+### Verification
+`npm run typecheck`, `npm run lint` (0 errors, 2 pre-existing warnings), `npm test` (200 passed), `npx playwright test` (31 passed), fake-backend e2e (`E2E_FAKE_BACKEND=1`, 19 passed), static export build ok. axe (wcag2a/aa, 2.1, 2.2) on live Overview, Personnel, filtered, sheet and palette states at 1440 and 390 widths: 0 violations, no horizontal overflow, no console errors. Screenshots: `/mnt/project-files/screenshots/ux-after/`.
+
+### Not done / next
+- Patrol, Activity, Training, Requests, Supervisor stay closed until Phase 1 activation and a real member sign-in.
+- Overview "Access" row truncates on narrow cards.
+- Build-flag split of preview code; runtime perf metrics.
