@@ -1,15 +1,7 @@
-import { PageHeader } from "@/components/hq/page-header";
-import { EmptyState, Panel } from "@/components/ui/primitives";
+import { SupervisorWorkspace } from "@/components/workspaces/supervisor";
 
-export const metadata = { title: "Supervisor workspace" };
+export const metadata = { title: "Supervisor" };
 
-export default function Page() {
-  return (
-    <>
-      <PageHeader title="Supervisor workspace" description="Your district's patrol, trainees and pending reviews." />
-      <Panel>
-        <EmptyState title="Planned for Milestone 4" body="Supervisor tools arrive with the request and approval workflows." />
-      </Panel>
-    </>
-  );
+export default function SupervisorPage() {
+  return <SupervisorWorkspace />;
 }

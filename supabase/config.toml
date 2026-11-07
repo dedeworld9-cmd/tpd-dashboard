@@ -1,0 +1,22 @@
+# Supabase CLI project settings for the parts this repository defines.
+# project_id is set by `supabase link`; it is not a secret.
+
+[auth.external.discord]
+enabled = true
+client_id = "env(DISCORD_CLIENT_ID)"
+secret = "env(DISCORD_CLIENT_SECRET)"
+
+[functions.roster-sync]
+# Scheduled runs authenticate with x-sync-secret instead of a user token; user calls are
+# still verified inside the function (Supabase Auth + is_command()).
+verify_jwt = false
+
+# The project signs user tokens with an asymmetric key (ECC P-256, Project Settings > JWT Keys). The gateway's
+# "Verify JWT with legacy secret" check only accepts the legacy HS256 secret, so it rejects real member sessions.
+# Both functions below authenticate the caller themselves before doing anything: they send the bearer token to
+# Supabase Auth (/auth/v1/user: signature, expiry, revoked sessions) and then check the roster (RLS / is_command()).
+[functions.discord-verify]
+verify_jwt = false
+
+[functions.integration-health]
+verify_jwt = false

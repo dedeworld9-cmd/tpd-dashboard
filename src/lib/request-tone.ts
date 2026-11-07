@@ -1,5 +1,5 @@
-import type { Tone } from "@/components/ui/primitives";
-import type { RequestState } from "./sample-data";
+import type { Tone } from "@/components/ui/status";
+import type { RequestState } from "@/lib/sample-data";
 
 export function stateTone(state: RequestState): Tone {
   switch (state) {
@@ -8,9 +8,9 @@ export function stateTone(state: RequestState): Tone {
     case "Denied":
       return "red";
     case "Under review":
-      return "blue";
+      return "gold";
     case "Submitted":
-      return "amber";
+      return "info";
     default:
       return "neutral";
   }
