@@ -45,7 +45,7 @@ export function ResourcesWorkspace() {
               </li>
             ))}
           </ul>
-          <div className="overflow-x-auto border-t border-line">
+          <div className="overflow-x-auto border-t border-line" tabIndex={0} role="region" aria-label="Table, scrollable">
             <table className="w-full min-w-[560px] text-left text-xs whitespace-nowrap">
               <thead className="bg-surface-2 text-3xs text-muted">
                 <tr>

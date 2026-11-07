@@ -80,7 +80,7 @@ export function DivisionWorkspace({ slug }: { slug: string }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardHeader title="Division positions" description={`${staff.vacancies} vacancies · roster, TPD | Divisions tab, checked ${VERIFIED_ON}`} />
-          <div className="overflow-x-auto border-t border-line">
+          <div className="overflow-x-auto border-t border-line" tabIndex={0} role="region" aria-label="Table, scrollable">
             <table className="w-full text-left text-xs">
               <thead className="bg-surface-2 text-3xs text-muted">
                 <tr>

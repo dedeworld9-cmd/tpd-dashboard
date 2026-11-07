@@ -167,7 +167,7 @@ export function DataTable<T>({
                       else pageKeys.forEach((k) => next.add(k));
                       onSelectedChange!(next);
                     }}
-                    className="size-3.5 accent-[var(--gold-ink)]"
+                    className="size-4 accent-[var(--gold-ink)]"
                   />
                 </th>
               ) : null}
@@ -184,7 +184,7 @@ export function DataTable<T>({
                       <button
                         type="button"
                         onClick={() => setSort(active ? (sort!.dir === "asc" ? { key: c.key, dir: "desc" } : null) : { key: c.key, dir: "asc" })}
-                        className={cn("inline-flex items-center gap-1 rounded hover:text-ink", active && "text-ink")}
+                        className={cn("inline-flex items-center gap-1 rounded py-1.5 -my-1.5 hover:text-ink", active && "text-ink")}
                       >
                         {c.header}
                         {active ? sort!.dir === "asc" ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden /> : <ChevronsUpDown className="size-3 opacity-40" aria-hidden />}
@@ -234,7 +234,7 @@ export function DataTable<T>({
                             else next.add(k);
                             onSelectedChange!(next);
                           }}
-                          className="size-3.5 accent-[var(--gold-ink)]"
+                          className="size-4 accent-[var(--gold-ink)]"
                         />
                       </td>
                     ) : null}

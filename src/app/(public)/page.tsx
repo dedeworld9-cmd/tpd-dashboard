@@ -206,7 +206,7 @@ export default function HomePage() {
               <li key={g.tier} className={cn("rounded-xl p-5", g.stars === 4 ? "bg-obsidian text-on-dark md:col-span-2" : "border border-line bg-surface")}>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold">{g.tier}</p>
-                  <span aria-label={`${g.stars} star tier`} className="flex gap-0.5">
+                  <span role="img" aria-label={`${g.stars} star tier`} className="flex gap-0.5">
                     {Array.from({ length: g.stars }, (_, i) => (
                       <Star key={i} aria-hidden strokeWidth={0} className={cn("size-3 fill-current", g.stars === 4 ? "text-gold" : "text-gold-ink")} />
                     ))}
